@@ -269,8 +269,8 @@ const VOICES=[
  {id:'cp',short:'CP',name:'Hand Clap',p:{level:.8,decay:.4}},
  {id:'ch',short:'CH',name:'Closed Hat',p:{level:.6,tune:.5,decay:.3}},
  {id:'oh',short:'OH',name:'Open Hat',p:{level:.55,tune:.5,decay:.4}},
- {id:'cr',short:'CR',name:'Crash',p:{level:.5,tune:.5}},
- {id:'rd',short:'RD',name:'Ride',p:{level:.45,tune:.5}},
+ {id:'cr',short:'CR',name:'Crash',p:{level:.5,tune:.5,decay:.6}},
+ {id:'rd',short:'RD',name:'Ride',p:{level:.45,tune:.5,decay:.6}},
  {id:'ac',short:'AC',name:'Accent',p:{}}
 ];
 const PNAMES={level:'Level',tune:'Tune',attack:'Attack',snappy:'Snappy',decay:'Decay'};
@@ -359,8 +359,8 @@ const SYN={
  },
  ch(t,v,p){choke(t);playBuf(CYM.hat,t,v*p.level*.95,{rate:.85+p.tune*.3,len:.03+p.decay*.09})},
  oh(t,v,p){choke(t);const rate=.85+p.tune*.3,len=.12+p.decay*.5;oh={g:playBuf(CYM.hat,t,v*p.level*.95,{rate,len}),end:t+len}},
- cr(t,v,p){playBuf(CYM.crash,t,v*p.level*.8,{rate:.85+p.tune*.3})},
- rd(t,v,p){playBuf(CYM.ride,t,v*p.level*.7,{rate:.85+p.tune*.3})}
+ cr(t,v,p){playBuf(CYM.crash,t,v*p.level*.85,{rate:.85+p.tune*.3,len:.5+p.decay*2.3})},
+ rd(t,v,p){playBuf(CYM.ride,t,v*p.level*.75,{rate:.85+p.tune*.3,len:.35+p.decay*2})}
 };
 ['lt','mt','ht'].forEach((id,i)=>{const f0=[95,135,185][i];SYN[id]=(t,v,p)=>{
   const f=f0*(.75+p.tune*.5),d=.15+p.decay*.55,o=osc('sine',f*1.6,t);o.frequency.exponentialRampToValueAtTime(f,t+.06);
@@ -378,26 +378,28 @@ function biquad(x,type,f,Q,sr){
   return x;
 }
 function cymbal(c,o){
-  const sr=c.sampleRate,n=Math.floor(o.dur*sr),x=new Float32Array(n),fs=o.freqs,ph=fs.map(()=>Math.random()),rf=o.ring;let rp=0;
+  const sr=c.sampleRate,n=Math.floor(o.dur*sr),x=new Float32Array(n),fs=o.freqs,ph=fs.map(()=>Math.random()),rf=o.ring,bells=o.bells||[];let rp=0;
   for(let i=0;i<n;i++){
     const t=i/sr;let a=0;
     for(let k=0;k<fs.length;k++){ph[k]+=fs[k]/sr;if(ph[k]>=1)ph[k]-=1;a+=ph[k]<.5?1:-1}
     a/=fs.length;rp+=rf/sr;if(rp>=1)rp-=1;
     const s=a*(rp<.5?1:-1)*(1-o.noise)+(Math.random()*2-1)*o.noise;
-    x[i]=s*(Math.exp(-t/o.decay)+o.click*Math.exp(-t/.003));
+    const env=(o.fast?o.fastAmt*Math.exp(-t/o.fast):0)+Math.exp(-t/o.decay)+o.click*Math.exp(-t/.003);
+    let bell=0;for(const [f,a,d] of bells)bell+=a*Math.sin(2*Math.PI*f*t)*Math.exp(-t/d);
+    x[i]=s*env+bell;
   }
   biquad(x,'hp',o.hp,.7,sr);biquad(x,'hp',o.hp,.7,sr);biquad(x,'bp',o.bp,o.q,sr);
   let pk=0;for(let i=0;i<n;i++)pk=Math.max(pk,Math.abs(x[i]));
   // 6-bit, ~32 kHz: hold each value, then round to 64 levels
   const step=sr/32000;let acc=0,held=0;
-  for(let i=0;i<n;i++){acc+=1;if(acc>=step||i===0){acc-=step;held=Math.round(x[i]/pk*31)/31}x[i]=held}
+  for(let i=0;i<n;i++){acc+=1;if(acc>=step||i===0){acc-=step;held=Math.round((x[i]/pk+(o.dither?(Math.random()-Math.random())/31:0))*31)/31}x[i]=held}
   const b=c.createBuffer(1,n,sr);b.getChannelData(0).set(x);return b;
 }
 function buildCymbals(c){
   return{
     hat:cymbal(c,{dur:.8,decay:.22,noise:.45,click:.8,hp:4800,bp:8200,q:.35,ring:1790,freqs:[317,436,522,605,743,912,1118,1471,1902,2387,3061,3833]}),
-    crash:cymbal(c,{dur:3.2,decay:.95,noise:.55,click:.4,hp:3600,bp:6800,q:.45,ring:1043,freqs:[211,289,343,431,517,628,749,883,1061,1297,1622,2054]}),
-    ride:cymbal(c,{dur:3.4,decay:1.15,noise:.22,click:.3,hp:2600,bp:5400,q:.9,ring:2611,freqs:[287,402,529,611,797,941,1213,1534,1789,2210,2903,3476]})
+    crash:cymbal(c,{dur:3,decay:.8,fast:.08,fastAmt:1.2,dither:true,noise:.6,click:.5,hp:3000,bp:7000,q:.4,ring:1043,freqs:[211,289,343,431,517,628,749,883,1061,1297,1622,2054]}),
+    ride:cymbal(c,{dur:3,decay:.9,fast:.05,fastAmt:.6,dither:true,bells:[[3150,.35,.45],[4420,.25,.35],[5870,.18,.3]],noise:.18,click:.4,hp:2400,bp:5600,q:.7,ring:2611,freqs:[287,402,529,611,797,941,1213,1534,1789,2210,2903,3476]})
   };
 }
 function playBuf(buf,t,peak,{rate=1,len=0}={}){
