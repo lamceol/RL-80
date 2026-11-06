@@ -225,6 +225,12 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
 
   <section class="voices" id="voices" aria-label="Instruments"></section>
 
+  <section class="groove mix" aria-label="Mix">
+    <div class="g-head"><h2>Mix</h2><span class="lbl" id="mixName">Punchy</span></div>
+    <div class="tpls" id="mixPresets"><button class="tpl" data-p="clean">Clean 909</button><button class="tpl" data-p="punchy">Punchy</button><button class="tpl" data-p="fat">Fat</button><button class="tpl" data-p="room">Room</button></div>
+    <div class="g-faders" id="mixFaders"></div>
+  </section>
+
   <section class="bank" aria-label="Patterns">
     <span class="lbl">Pattern</span>
     <div id="pats" style="display:flex;gap:8px;flex-wrap:wrap"></div>
@@ -261,7 +267,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
       <div class="ex-col"><span class="lbl">Length</span><div class="seg" id="exBars"><button data-b="1">1 bar</button><button data-b="2">2</button><button data-b="4">4</button><button data-b="8">8</button></div></div>
       <div class="ex-btns"><button class="ex-btn" id="exMidi">MIDI file</button><button class="ex-btn" id="exWav">WAV audio</button></div>
     </div>
-    <p class="notes" id="exStatus" aria-live="polite">Exports the pattern you're on. Swing, groove, humanise and mutes are included. The WAV loops seamlessly: cymbal tails wrap round to the start.</p>
+    <p class="notes" id="exStatus" aria-live="polite">Exports the pattern you're on. Swing, groove, humanise, mutes and the Mix are included; the WAV is stereo. The WAV loops seamlessly: cymbal tails wrap round to the start.</p>
   </section>
 
   <section class="backup" aria-label="Backup">
@@ -309,6 +315,8 @@ try{const s=JSON.parse(localStorage.getItem('rb16')||'null');if(s&&s.patterns&&s
 }}catch(e){}
 const GDEF={swing:50,res:16,tpl:'straight',amount:1,hTime:0,hVel:0,lockKick:false};
 state.groove={...GDEF,...(state.groove||{})};delete state.shuffle;
+const MIX_PRESETS={clean:{bass:0,punch:0,warmth:0,room:0,width:0},punchy:{bass:.35,punch:.45,warmth:.25,room:.12,width:.5},fat:{bass:.7,punch:.65,warmth:.55,room:.15,width:.6},room:{bass:.3,punch:.35,warmth:.2,room:.45,width:.8}};
+state.mix={...MIX_PRESETS.punchy,...(state.mix||{})};
 state.mute=state.mute||{};state.solo=state.solo||{};
 VOICES.forEach(v=>{const sv=state.params[v.id]||{},o={...v.p};for(const k in v.p)if(typeof sv[k]==='number')o[k]=sv[k];state.params[v.id]=o});
 if(!state.kit909){['bd','lt','mt','ht','cp'].forEach(id=>{state.params[id]={...VOICES.find(v=>v.id===id).p,level:state.params[id].level}});state.kit909=1}
@@ -344,11 +352,40 @@ function softClip(c,from,to){
   const pre=c.createGain(),sh=c.createWaveShaper(),post=c.createGain();pre.gain.value=.5;post.gain.value=2;sh.curve=clipCurve;sh.oversample='2x';
   from.connect(pre);pre.connect(sh);sh.connect(post);post.connect(to);
 }
+/* ---------- mix: per-drum stereo position, then bass, warmth, punch and room on the whole kit ---------- */
+const PAN={bd:0,sd:0,lt:-.45,mt:0,ht:.45,rs:-.2,cp:.12,ch:.3,oh:.3,cr:-.35,rd:.4};
+function makeIR(c,sec){const n=Math.floor(c.sampleRate*sec),b=c.createBuffer(2,n,c.sampleRate);let sd=4242;const r=()=>(sd=(Math.imul(sd,1664525)+1013904223)>>>0)/4294967296;
+  for(let ch=0;ch<2;ch++){const d=b.getChannelData(ch);let lp=0;for(let i=0;i<n;i++){const t=i/n;lp+=.35*((r()*2-1)-lp);d[i]=lp*Math.pow(1-t,3)*Math.exp(-6*t)*(i<c.sampleRate*.004?i/(c.sampleRate*.004):1)}}
+  return b}
+function buildChain(c,dest){
+  const C={c,input:c.createGain(),pan:{}};
+  for(const id in PAN){const p=c.createStereoPanner?c.createStereoPanner():c.createGain();p.connect(C.input);C.pan[id]=p}
+  C.bass=c.createBiquadFilter();C.bass.type='lowshelf';C.bass.frequency.value=95;
+  C.sat=c.createWaveShaper();C.sat.oversample='4x';C.satIn=c.createGain();C.satOut=c.createGain();C.dry=c.createGain();
+  C.comp=c.createDynamicsCompressor();C.comp.attack.value=.025;C.comp.release.value=.16;C.comp.knee.value=8;C.makeup=c.createGain();
+  C.rev=c.createConvolver();C.rev.buffer=makeIR(c,.9);C.revSend=c.createGain();C.revLP=c.createBiquadFilter();C.revLP.type='lowpass';C.revLP.frequency.value=6500;
+  C.out=c.createGain();
+  C.input.connect(C.bass);C.bass.connect(C.dry);C.bass.connect(C.satIn);C.satIn.connect(C.sat);C.sat.connect(C.satOut);
+  C.dry.connect(C.comp);C.satOut.connect(C.comp);C.comp.connect(C.makeup);C.makeup.connect(C.out);
+  C.makeup.connect(C.revSend);C.revSend.connect(C.revLP);C.revLP.connect(C.rev);C.rev.connect(C.out);
+  softClip(c,C.out,dest);applyMix(C);return C;
+}
+function applyMix(C){
+  const m=state.mix,t=C.c.currentTime,set=(p,v)=>p.setTargetAtTime(v,t,.02);
+  set(C.bass.gain,m.bass*9);                                                    // up to +9 dB below ~95 Hz
+  const k=1+m.warmth*4,cv=new Float32Array(1025);for(let i=0;i<1025;i++){const x=i/512-1;cv[i]=Math.tanh(k*x)/Math.tanh(k)}C.sat.curve=cv;
+  set(C.satIn.gain,.6);set(C.satOut.gain,m.warmth*1.1);set(C.dry.gain,1-m.warmth*.45); // tape-style warmth, blended in
+  C.comp.threshold.setTargetAtTime(-4-m.punch*20,t,.02);C.comp.ratio.setTargetAtTime(1+m.punch*4,t,.02);
+  set(C.makeup.gain,Math.pow(10,(m.punch*20*(1-1/(1+m.punch*4))*.5)/20));      // keep the level roughly the same
+  set(C.revSend.gain,m.room*.5);set(C.out.gain,state.volume);
+  for(const id in PAN){const p=C.pan[id];if(p.pan)set(p.pan,PAN[id]*m.width)}
+}
+let LIVE=null;
 function ensureAudio(){
   if(!ctx){
     try{if(navigator.audioSession)navigator.audioSession.type='playback'}catch(e){}
     ctx=new (window.AudioContext||window.webkitAudioContext)();
-    master=ctx.createGain();master.gain.value=state.volume;softClip(ctx,master,ctx.destination);
+    LIVE=buildChain(ctx,ctx.destination);master=LIVE.input;CH=LIVE;
     noiseBuf=ctx.createBuffer(1,ctx.sampleRate*2,ctx.sampleRate);
     const d=noiseBuf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
     curve=new Float32Array(1024);for(let i=0;i<1024;i++){const x=i/511.5-1;curve[i]=Math.tanh(x*2.2)}
@@ -497,7 +534,8 @@ function playUser(id,buf,t,v,p){
   if(id==='oh')oh={g,end:t+(len||full)};
 }
 function choke(t){if(oh&&oh.end>t){const gp=oh.g.gain;if(gp.cancelAndHoldAtTime)gp.cancelAndHoldAtTime(t);else gp.cancelScheduledValues(t);gp.setTargetAtTime(.0001,t,.008)}oh=null}
-function trigger(id,t,v){const u=samples[id];if(u){playUser(id,u.buf,t,v,state.params[id]);return}if(SYN[id])SYN[id](t,v,state.params[id])}
+let CH=null;
+function trigger(id,t,v){const keep=master;if(CH&&CH.pan[id])master=CH.pan[id];try{const u=samples[id];if(u){playUser(id,u.buf,t,v,state.params[id]);return}if(SYN[id])SYN[id](t,v,state.params[id])}finally{master=keep}}
 
 /* ---------- sequencer ---------- */
 let playing=false,timer,step=0,nextTime=0,queue=[],nowStep=-1,pending=null,wake=null;
@@ -644,7 +682,7 @@ $('hTime').oninput=e=>setGroove('hTime',+e.target.value);
 $('hVel').oninput=e=>setGroove('hVel',+e.target.value);
 $('lockKick').onchange=e=>setGroove('lockKick',e.target.checked);
 const ac=$('accent');ac.value=Math.round(state.accent*100);$('accOut').textContent=ac.value;ac.oninput=()=>{state.accent=ac.value/100;$('accOut').textContent=ac.value;save()};
-const vo=$('volume');vo.value=Math.round(state.volume*100);$('volOut').textContent=vo.value;vo.oninput=()=>{state.volume=vo.value/100;$('volOut').textContent=vo.value;if(master)master.gain.setTargetAtTime(state.volume,ctx.currentTime,.02);save()};
+const vo=$('volume');vo.value=Math.round(state.volume*100);$('volOut').textContent=vo.value;vo.oninput=()=>{state.volume=vo.value/100;$('volOut').textContent=vo.value;if(LIVE)LIVE.out.gain.setTargetAtTime(state.volume,ctx.currentTime,.02);save()};
 let clearArm=null;
 $('clear').onclick=e=>{const b=e.currentTarget;
   if(!clearArm){b.textContent='Tap to confirm';b.classList.add('warn');clearArm=setTimeout(()=>{clearArm=null;b.textContent='Clear';b.classList.remove('warn')},3000);return}
@@ -685,24 +723,22 @@ function buildMidi(bars){
   const len=d.length,head=[...txt('MThd'),0,0,0,6,0,0,0,1,0,PPQ,...txt('MTrk'),len>>>24&255,len>>16&255,len>>8&255,len&255];
   return new Blob([new Uint8Array([...head,...d])],{type:'audio/midi'});
 }
-function encodeWav(x,sr){
-  const n=x.length,buf=new ArrayBuffer(44+n*2),dv=new DataView(buf),w=(o,t)=>{for(let i=0;i<t.length;i++)dv.setUint8(o+i,t.charCodeAt(i))};
-  w(0,'RIFF');dv.setUint32(4,36+n*2,true);w(8,'WAVE');w(12,'fmt ');dv.setUint32(16,16,true);dv.setUint16(20,1,true);dv.setUint16(22,1,true);
-  dv.setUint32(24,sr,true);dv.setUint32(28,sr*2,true);dv.setUint16(32,2,true);dv.setUint16(34,16,true);w(36,'data');dv.setUint32(40,n*2,true);
-  for(let i=0;i<n;i++){const v=Math.max(-1,Math.min(1,x[i]));dv.setInt16(44+i*2,v<0?v*0x8000:v*0x7fff,true)}
+function encodeWav(chs,sr){ // 16-bit stereo
+  const C=chs.length,n=chs[0].length,bytes=n*C*2,buf=new ArrayBuffer(44+bytes),dv=new DataView(buf),w=(o,t)=>{for(let i=0;i<t.length;i++)dv.setUint8(o+i,t.charCodeAt(i))};
+  w(0,'RIFF');dv.setUint32(4,36+bytes,true);w(8,'WAVE');w(12,'fmt ');dv.setUint32(16,16,true);dv.setUint16(20,1,true);dv.setUint16(22,C,true);
+  dv.setUint32(24,sr,true);dv.setUint32(28,sr*C*2,true);dv.setUint16(32,C*2,true);dv.setUint16(34,16,true);w(36,'data');dv.setUint32(40,bytes,true);
+  for(let i=0,o=44;i<n;i++)for(let c=0;c<C;c++,o+=2){const v=Math.max(-1,Math.min(1,chs[c][i]));dv.setInt16(o,v<0?v*0x8000:v*0x7fff,true)}
   return new Blob([buf],{type:'audio/wav'});
 }
 async function renderWav(bars){
   ensureAudio();
-  const sr=44100,len=bars*16*stepDur(),tail=2.2,off=new OfflineAudioContext(1,Math.ceil(sr*(len+tail)),sr);
-  const m=off.createGain();m.gain.value=state.volume;softClip(off,m,off.destination);
-  const keep=[ctx,master,oh];ctx=off;master=m;oh=null;
-  try{eventsFor(bars).forEach(e=>trigger(e.id,e.t,e.v))}finally{[ctx,master,oh]=keep}
-  const d=(await off.startRendering()).getChannelData(0),L=Math.round(sr*len),out=new Float32Array(L);
-  out.set(d.subarray(0,L));for(let i=L;i<d.length;i++)out[(i-L)%L]+=d[i];
-  let pk=0;for(let i=0;i<L;i++)pk=Math.max(pk,Math.abs(out[i]));
-  if(pk>.98)for(let i=0;i<L;i++)out[i]*=.98/pk;
-  return encodeWav(out,sr);
+  const sr=44100,len=bars*16*stepDur(),tail=2.2,off=new OfflineAudioContext(2,Math.ceil(sr*(len+tail)),sr);
+  const keep=[ctx,master,oh,CH];ctx=off;const OC=buildChain(off,off.destination);master=OC.input;CH=OC;oh=null;
+  try{eventsFor(bars).forEach(e=>trigger(e.id,e.t,e.v))}finally{[ctx,master,oh,CH]=keep}
+  const r=await off.startRendering(),L=Math.round(sr*len),chs=[0,1].map(c=>{const d=r.getChannelData(c),o=new Float32Array(L);o.set(d.subarray(0,L));for(let i=L;i<d.length;i++)o[(i-L)%L]+=d[i];return o});
+  let pk=0;for(const o of chs)for(let i=0;i<L;i++)pk=Math.max(pk,Math.abs(o[i]));
+  if(pk>.98)for(const o of chs)for(let i=0;i<L;i++)o[i]*=.98/pk;
+  return encodeWav(chs,sr);
 }
 async function deliver(blob,name){
   const file=new File([blob],name,{type:blob.type});
@@ -807,7 +843,20 @@ $('bkYes').onclick=async()=>{
     clearTimeout(saveT);localStorage.setItem('rb16',JSON.stringify(j.state));location.reload();
   }catch(e){$('bkStatus').textContent='The restore failed, so nothing was changed. Try again.'}
 };
-setBpm(state.bpm);renderGroove();renderPats();renderVoices();renderEditor();renderMatrix();renderExport();requestAnimationFrame(draw);loadSavedSamples();startSounds();
+/* ---------- mix controls ---------- */
+const MIXK=[['bass','Bass'],['punch','Punch'],['warmth','Warmth'],['room','Room'],['width','Width']];
+function renderMix(){
+  const box=$('mixFaders');if(!box.children.length)MIXK.forEach(([k,n])=>{const l=document.createElement('label');l.className='fader';
+    l.innerHTML=`<span class="row"><span class="lbl">${n}</span><output id="mx-${k}-o"></output></span><input type="range" id="mx-${k}" min="0" max="100">`;box.appendChild(l);
+    l.querySelector('input').oninput=e=>{state.mix[k]=e.target.value/100;mixChanged()}});
+  MIXK.forEach(([k])=>{$('mx-'+k).value=Math.round(state.mix[k]*100);$('mx-'+k+'-o').textContent=Math.round(state.mix[k]*100)});
+  const hit=Object.entries(MIX_PRESETS).find(([,p])=>MIXK.every(([k])=>Math.abs(p[k]-state.mix[k])<.005));
+  document.querySelectorAll('#mixPresets .tpl').forEach(b=>{const on=hit&&b.dataset.p===hit[0];b.classList.toggle('on',!!on);b.setAttribute('aria-pressed',!!on)});
+  $('mixName').textContent=hit?{clean:'Clean 909',punchy:'Punchy',fat:'Fat',room:'Room'}[hit[0]]:'Custom';
+}
+function mixChanged(){if(LIVE)applyMix(LIVE);renderMix();save()}
+document.querySelectorAll('#mixPresets .tpl').forEach(b=>b.onclick=()=>{state.mix={...MIX_PRESETS[b.dataset.p]};mixChanged()});
+setBpm(state.bpm);renderGroove();renderMix();renderPats();renderVoices();renderEditor();renderMatrix();renderExport();requestAnimationFrame(draw);loadSavedSamples();startSounds();
 if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'))navigator.serviceWorker.register('sw.js').catch(()=>{});
 })();
 </script>

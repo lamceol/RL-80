@@ -1,6 +1,6 @@
 /* RL-80 offline support: keeps a copy of the app on the phone.
    Online it always fetches the latest version first (and refreshes the copy); offline it uses the copy. */
-const CACHE='rl80-v4';
+const CACHE='rl80-v5';
 const CORE=['./','index.html','sounds.js','manifest.webmanifest','fonts/fonts.css',
   'fonts/BarlowCondensed-500.woff2','fonts/BarlowCondensed-600.woff2','fonts/BarlowCondensed-700.woff2',
   'fonts/Michroma-400.woff2','fonts/ShareTechMono-400.woff2',
