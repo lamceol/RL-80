@@ -123,6 +123,15 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
 .ed-head h2 em{font-style:normal;color:var(--lit)}
 .params{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px 18px}
 .params:empty{display:none}
+.smp-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;border-top:1px solid var(--edge);padding-top:12px}
+.smp-name{flex:1;min-width:0;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.smp-name.on{color:var(--lit)}
+.smp-btns{display:flex;gap:8px}
+.smp-row .notes{flex-basis:100%}
+@media (max-width:520px){.smp-btns{flex-basis:100%}.smp-btns .small{flex:1}}
+.smp-row .notes:empty{display:none}
+.voice.smp span{color:var(--lit)}
+
 .steps{display:grid;grid-template-columns:repeat(16,minmax(0,1fr));gap:6px}
 .step{aspect-ratio:3/4;max-width:100%;border-radius:5px;border:1px solid #000;background:var(--key);color:var(--key-ink);display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:6px 0 7px;box-shadow:0 3px 0 #000a;font-weight:700;font-size:14px}
 .step.alt{background:var(--key-alt)}
@@ -194,6 +203,12 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
       <span class="lbl">Tap a key to set a step</span>
     </div>
     <div class="params" id="params"></div>
+    <div class="smp-row" id="smpRow">
+      <span class="lbl">Sound</span><span class="smp-name" id="smpName">Built-in</span>
+      <span class="smp-btns"><button class="small" id="smpLoad">Load sample</button><button class="small" id="smpClear">Use built-in</button></span>
+      <input type="file" id="smpFile" accept="audio/*,.wav,.aif,.aiff,.mp3,.m4a,.caf" hidden>
+      <p class="notes" id="smpMsg" aria-live="polite"></p>
+    </div>
     <div class="steps" id="steps"></div>
     <div class="scale" aria-hidden="true"><span>Beat 1</span><span>Beat 2</span><span>Beat 3</span><span>Beat 4</span></div>
   </section>
@@ -252,8 +267,8 @@ const VOICES=[
  {id:'ht',short:'HT',name:'High Tom',p:{level:.75,tune:.5,decay:.5}},
  {id:'rs',short:'RS',name:'Rim Shot',p:{level:.7}},
  {id:'cp',short:'CP',name:'Hand Clap',p:{level:.8,decay:.4}},
- {id:'ch',short:'CH',name:'Closed Hat',p:{level:.6,decay:.3}},
- {id:'oh',short:'OH',name:'Open Hat',p:{level:.55,decay:.4}},
+ {id:'ch',short:'CH',name:'Closed Hat',p:{level:.6,tune:.5,decay:.3}},
+ {id:'oh',short:'OH',name:'Open Hat',p:{level:.55,tune:.5,decay:.4}},
  {id:'cr',short:'CR',name:'Crash',p:{level:.5,tune:.5}},
  {id:'rd',short:'RD',name:'Ride',p:{level:.45,tune:.5}},
  {id:'ac',short:'AC',name:'Accent',p:{}}
@@ -277,6 +292,7 @@ try{const s=JSON.parse(localStorage.getItem('rb16')||'null');if(s&&s.patterns&&s
 }}catch(e){}
 const GDEF={swing:50,res:16,tpl:'straight',amount:1,hTime:0,hVel:0,lockKick:false};
 state.groove={...GDEF,...(state.groove||{})};delete state.shuffle;
+VOICES.forEach(v=>state.params[v.id]={...v.p,...(state.params[v.id]||{})});
 
 /* groove templates: per-step timing (fraction of a 16th, + = late) and level */
 function G(id,name,o4,v4,mods){const off=[],vel=[];for(let i=0;i<16;i++){off.push(o4[i%4]);vel.push(v4[i%4])}
@@ -298,7 +314,7 @@ function stepFeel(s){const g=state.groove,tp=tplOf(g);return{off:swingOffset(s,g
 let saveT;function save(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem('rb16',JSON.stringify(state))}catch(e){}},250)}
 
 /* ---------- audio ---------- */
-let ctx,master,noiseBuf,curve,oh=null;
+let ctx,master,noiseBuf,curve,CYM,oh=null;
 function ensureAudio(){
   if(!ctx){
     try{if(navigator.audioSession)navigator.audioSession.type='playback'}catch(e){}
@@ -309,6 +325,7 @@ function ensureAudio(){
     noiseBuf=ctx.createBuffer(1,ctx.sampleRate*2,ctx.sampleRate);
     const d=noiseBuf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
     curve=new Float32Array(1024);for(let i=0;i<1024;i++){const x=i/511.5-1;curve[i]=Math.tanh(x*2.2)}
+    CYM=buildCymbals(ctx);
   }
   if(ctx.state!=='running')ctx.resume();
 }
@@ -340,24 +357,83 @@ const SYN={
   const tail=.1+p.decay*.4;g.gain.setValueAtTime(L*.75,t+.032);g.gain.exponentialRampToValueAtTime(.0001,t+.032+tail);
   chain(noise(t,tail+.06),filt('highpass',700),filt('bandpass',1150,1.3),g);
  },
- ch(t,v,p){choke(t);metal(t,1,10000,7500,v*p.level,.035+p.decay*.11)},
- oh(t,v,p){choke(t);const d=.18+p.decay*.8;oh={g:metal(t,1,10000,7500,v*p.level*.85,d),end:t+d}},
- cr(t,v,p){const m=.85+p.tune*.35,d=1.6;metal(t,m,7500,5000,v*p.level*.7,d);chain(noise(t,d),filt('highpass',6000),vca(t,v*p.level*.35,d*.8))},
- rd(t,v,p){const m=1.4+p.tune*.5;metal(t,m,9000,5500,v*p.level*.8,1.7)}
+ ch(t,v,p){choke(t);playBuf(CYM.hat,t,v*p.level*.8,{rate:.85+p.tune*.3,len:.045+p.decay*.16})},
+ oh(t,v,p){choke(t);const rate=.85+p.tune*.3,len=.22+p.decay*.85;oh={g:playBuf(CYM.hat,t,v*p.level*.8,{rate,len}),end:t+len}},
+ cr(t,v,p){playBuf(CYM.crash,t,v*p.level*.8,{rate:.85+p.tune*.3})},
+ rd(t,v,p){playBuf(CYM.ride,t,v*p.level*.7,{rate:.85+p.tune*.3})}
 };
 ['lt','mt','ht'].forEach((id,i)=>{const f0=[95,135,185][i];SYN[id]=(t,v,p)=>{
   const f=f0*(.75+p.tune*.5),d=.15+p.decay*.55,o=osc('sine',f*1.6,t);o.frequency.exponentialRampToValueAtTime(f,t+.06);
   chain(o,vca(t,v*p.level*.95,d));o.start(t);o.stop(t+d+.05);
   chain(noise(t,.03),filt('lowpass',f*6),vca(t,v*p.level*.15,.025));
 }});
-function metal(t,mult,bpF,hpF,peak,dec){
-  const g=vca(t,peak,dec),hp=filt('highpass',hpF),bp=filt('bandpass',bpF,.8),mix=ctx.createGain();mix.gain.value=.5;
-  chain(mix,bp,hp,g);
-  [205.3,304.4,369.6,522.7,540,800].forEach(f=>{const o=osc('square',f*mult,t);o.connect(mix);o.start(t);o.stop(t+dec+.05)});
-  return g;
+/* 909-style cymbals: build a metallic hit once, crush it to 6 bits (like the 909's sample chips),
+   then play it back through a decay envelope, as the 909 does. */
+function biquad(x,type,f,Q,sr){
+  const w=2*Math.PI*f/sr,c=Math.cos(w),al=Math.sin(w)/(2*Q);let b0,b1,b2;
+  if(type==='hp'){b0=(1+c)/2;b1=-(1+c);b2=b0}else if(type==='lp'){b0=(1-c)/2;b1=1-c;b2=b0}else{b0=al;b1=0;b2=-al}
+  const a0=1+al,a1=-2*c/a0,a2=(1-al)/a0;b0/=a0;b1/=a0;b2/=a0;
+  let x1=0,x2=0,y1=0,y2=0;
+  for(let i=0;i<x.length;i++){const xi=x[i],y=b0*xi+b1*x1+b2*x2-a1*y1-a2*y2;x2=x1;x1=xi;y2=y1;y1=y;x[i]=y}
+  return x;
+}
+function cymbal(c,o){
+  const sr=c.sampleRate,n=Math.floor(o.dur*sr),x=new Float32Array(n),fs=o.freqs,ph=fs.map(()=>Math.random()),rf=o.ring;let rp=0;
+  for(let i=0;i<n;i++){
+    const t=i/sr;let a=0;
+    for(let k=0;k<fs.length;k++){ph[k]+=fs[k]/sr;if(ph[k]>=1)ph[k]-=1;a+=ph[k]<.5?1:-1}
+    a/=fs.length;rp+=rf/sr;if(rp>=1)rp-=1;
+    const s=a*(rp<.5?1:-1)*(1-o.noise)+(Math.random()*2-1)*o.noise;
+    x[i]=s*(Math.exp(-t/o.decay)+o.click*Math.exp(-t/.003));
+  }
+  biquad(x,'hp',o.hp,.7,sr);biquad(x,'hp',o.hp,.7,sr);biquad(x,'bp',o.bp,o.q,sr);
+  let pk=0;for(let i=0;i<n;i++)pk=Math.max(pk,Math.abs(x[i]));
+  // 6-bit, ~32 kHz: hold each value, then round to 64 levels
+  const step=sr/32000;let acc=0,held=0;
+  for(let i=0;i<n;i++){acc+=1;if(acc>=step||i===0){acc-=step;held=Math.round(x[i]/pk*31)/31}x[i]=held}
+  const b=c.createBuffer(1,n,sr);b.getChannelData(0).set(x);return b;
+}
+function buildCymbals(c){
+  return{
+    hat:cymbal(c,{dur:1.3,decay:.45,noise:.5,click:.6,hp:6800,bp:10200,q:.6,ring:1790,freqs:[317,436,522,605,743,912,1118,1471,1902,2387,3061,3833]}),
+    crash:cymbal(c,{dur:3.2,decay:.95,noise:.55,click:.4,hp:3600,bp:6800,q:.45,ring:1043,freqs:[211,289,343,431,517,628,749,883,1061,1297,1622,2054]}),
+    ride:cymbal(c,{dur:3.4,decay:1.15,noise:.22,click:.3,hp:2600,bp:5400,q:.9,ring:2611,freqs:[287,402,529,611,797,941,1213,1534,1789,2210,2903,3476]})
+  };
+}
+function playBuf(buf,t,peak,{rate=1,len=0}={}){
+  const src=ctx.createBufferSource();src.buffer=buf;src.playbackRate.value=rate;
+  const g=ctx.createGain(),full=buf.duration/rate,L=len?Math.min(len,full):full;
+  g.gain.setValueAtTime(Math.max(peak,.0002),t);
+  if(len){g.gain.exponentialRampToValueAtTime(.0001,t+L)}else{g.gain.setValueAtTime(Math.max(peak,.0002),t+L*.75);g.gain.exponentialRampToValueAtTime(.0001,t+L)}
+  src.connect(g);g.connect(master);src.start(t);src.stop(t+L+.02);return g;
+}
+/* your own samples: one per drum, kept in this browser */
+const samples={};
+const SDB={open(){return new Promise((res,rej)=>{const r=indexedDB.open('rl80',1);r.onupgradeneeded=()=>r.result.createObjectStore('samples');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})},
+  async run(mode,fn){const db=await this.open();return new Promise((res,rej)=>{const tx=db.transaction('samples',mode),st=tx.objectStore('samples'),r=fn(st);tx.oncomplete=()=>res(r&&r.result);tx.onerror=()=>rej(tx.error)})}};
+let decodeCtx=null;
+function decode(ab){
+  decodeCtx=decodeCtx||new (window.OfflineAudioContext||window.webkitOfflineAudioContext)(1,1,44100);
+  return new Promise((res,rej)=>decodeCtx.decodeAudioData(ab.slice(0),res,rej));
+}
+async function loadSavedSamples(){
+  try{
+    const db=await SDB.open();
+    const all=await new Promise((res,rej)=>{const out=[],r=db.transaction('samples').objectStore('samples').openCursor();
+      r.onsuccess=()=>{const c=r.result;if(c){out.push([c.key,c.value]);c.continue()}else res(out)};r.onerror=()=>rej(r.error)});
+    for(const [id,v] of all){try{samples[id]={name:v.name,buf:await decode(v.data)}}catch(e){}}
+    renderVoices();renderEditor();
+  }catch(e){}
+}
+function playUser(id,buf,t,v,p){
+  if(id==='ch'||id==='oh')choke(t);
+  const rate=p.tune!==undefined?Math.pow(2,(p.tune-.5)*2):1,full=buf.duration/rate;
+  const len=p.decay!==undefined?full*(.08+.92*p.decay):0;
+  const g=playBuf(buf,t,v*p.level*1.1,{rate,len:len&&len<full?len:0});
+  if(id==='oh')oh={g,end:t+(len||full)};
 }
 function choke(t){if(oh&&oh.end>t){const gp=oh.g.gain;if(gp.cancelAndHoldAtTime)gp.cancelAndHoldAtTime(t);else gp.cancelScheduledValues(t);gp.setTargetAtTime(.0001,t,.008)}oh=null}
-function trigger(id,t,v){if(SYN[id])SYN[id](t,v,state.params[id])}
+function trigger(id,t,v){const u=samples[id];if(u){playUser(id,u.buf,t,v,state.params[id]);return}if(SYN[id])SYN[id](t,v,state.params[id])}
 
 /* ---------- sequencer ---------- */
 let playing=false,timer,step=0,nextTime=0,queue=[],nowStep=-1,pending=null,wake=null;
@@ -440,8 +516,8 @@ function renderPats(){
 function renderVoices(){
   const box=$('voices');box.innerHTML='';
   VOICES.forEach(v=>{
-    const b=document.createElement('button');b.className='voice'+(state.sel===v.id?' sel':'');b.dataset.id=v.id;
-    b.innerHTML=`<b>${v.short}</b><span>${v.name}</span>`;
+    const b=document.createElement('button');b.className='voice'+(state.sel===v.id?' sel':'')+(samples[v.id]?' smp':'');b.dataset.id=v.id;
+    b.innerHTML=`<b>${v.short}</b><span>${samples[v.id]?'Sample':v.name}</span>`;
     b.onclick=()=>{state.sel=v.id;if(v.id!=='ac'){ensureAudio();trigger(v.id,ctx.currentTime+.01,.85)}renderVoices();renderEditor();renderMatrix();save()};
     box.appendChild(b);
   });
@@ -450,7 +526,7 @@ function renderEditor(){
   const v=VOICES.find(x=>x.id===state.sel),pat=state.patterns[state.pat][v.id];
   $('edName').innerHTML=`${v.name} <em>· ${'ABCD'[state.pat]}</em>`;
   const pb=$('params');pb.innerHTML='';
-  Object.keys(v.p).forEach(k=>{
+  Object.keys(v.p).filter(k=>!(samples[v.id]&&(k==='attack'||k==='snappy'))).forEach(k=>{
     const val=Math.round(state.params[v.id][k]*100);
     const l=document.createElement('label');l.className='fader';
     l.innerHTML=`<span class="row"><span class="lbl">${PNAMES[k]}</span><output>${val}</output></span><input type="range" id="p-${v.id}-${k}" min="0" max="100" value="${val}">`;
@@ -460,6 +536,7 @@ function renderEditor(){
     pb.appendChild(l);
   });
   if(v.id==='ac'){pb.innerHTML='<p class="notes" style="grid-column:1/-1">Accented steps hit every instrument on that step harder. Set how much with the Accent fader above.</p>'}
+  renderSampleRow(v);
   const sb=$('steps');sb.innerHTML='';stepEls=[];
   for(let i=0;i<16;i++){
     const b=document.createElement('button');
@@ -600,7 +677,34 @@ $('exWav').onclick=async()=>{
 ['bpm','swing','gAmt','hTime','hVel','accent','volume'].forEach(id=>$(id).addEventListener('input',()=>{clearReady();renderExport()}));
 document.addEventListener('click',e=>{if(e.target.closest('.pat,.step,.cell,#tDown,#tUp,#reset,#clear,.tpl,#res button'))setTimeout(()=>{clearReady();renderExport()},0)});
 
-setBpm(state.bpm);renderGroove();renderPats();renderVoices();renderEditor();renderMatrix();renderExport();requestAnimationFrame(draw);
+function renderSampleRow(v){
+  $('smpRow').hidden=v.id==='ac';
+  const u=samples[v.id];
+  $('smpName').textContent=u?u.name:(['ch','oh','cr','rd'].includes(v.id)?'Built-in · 6-bit 909-style':'Built-in synth');
+  $('smpName').classList.toggle('on',!!u);$('smpClear').hidden=!u;
+}
+$('smpLoad').onclick=()=>{$('smpMsg').textContent='';$('smpFile').value='';$('smpFile').click()};
+$('smpFile').onchange=async()=>{
+  const f=$('smpFile').files[0],id=state.sel,v=VOICES.find(x=>x.id===id);if(!f||id==='ac')return;
+  if(f.size>15e6){$('smpMsg').textContent='That file is over 15 MB. Pick a shorter one-shot sample.';return}
+  $('smpMsg').textContent='Loading…';
+  try{
+    const data=await f.arrayBuffer(),buf=await decode(data);
+    samples[id]={name:f.name,buf};
+    const p=state.params[id];if('tune' in p)p.tune=.5;if('decay' in p)p.decay=1;save();
+    try{await SDB.run('readwrite',st=>st.put({name:f.name,data},id))}catch(e){$('smpMsg').textContent='Loaded, but this browser could not save it for next time.'}
+    if($('smpMsg').textContent==='Loading…')$('smpMsg').textContent=`${v.name} now plays ${f.name}. Tune and Decay work on it too.`;
+    renderVoices();renderEditor();ensureAudio();if(!playing)trigger(id,ctx.currentTime+.01,.85);
+  }catch(e){$('smpMsg').textContent="That file couldn't be read. Try a WAV, AIFF, MP3 or M4A file."}
+};
+$('smpClear').onclick=async()=>{
+  const id=state.sel,v=VOICES.find(x=>x.id===id);delete samples[id];
+  state.params[id]={...v.p,level:state.params[id].level};save();
+  try{await SDB.run('readwrite',st=>st.delete(id))}catch(e){}
+  $('smpMsg').textContent=`${v.name} is back to the built-in sound.`;
+  renderVoices();renderEditor();ensureAudio();if(!playing)trigger(id,ctx.currentTime+.01,.85);
+};
+setBpm(state.bpm);renderGroove();renderPats();renderVoices();renderEditor();renderMatrix();renderExport();requestAnimationFrame(draw);loadSavedSamples();
 })();
 </script>
 </body>
