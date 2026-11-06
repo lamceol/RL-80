@@ -10,7 +10,7 @@ stored: the sounds are generated on the device by `sounds.js` in a background wo
 - 909-style knobs: kick Tune / Attack / Decay, snare Tune / Tone / Snappy, toms Tune / Decay
 - 16-step sequencer, accent track, four pattern banks
 - Swing (16ths or 8ths), groove templates, groove amount and humanise
-- Mix: Bass, Punch, Warmth, Room and stereo Width, with presets (Clean 909, Punchy, Fat, Room)
+- Built-in mix: a little extra bass, punch, warmth and room, in stereo
 - Mute and solo per drum
 - Load your own sample onto any drum (kept on the device)
 - Export the loop as MIDI or stereo WAV

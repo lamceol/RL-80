@@ -225,12 +225,6 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
 
   <section class="voices" id="voices" aria-label="Instruments"></section>
 
-  <section class="groove mix" aria-label="Mix">
-    <div class="g-head"><h2>Mix</h2><span class="lbl" id="mixName">Punchy</span></div>
-    <div class="tpls" id="mixPresets"><button class="tpl" data-p="clean">Clean 909</button><button class="tpl" data-p="punchy">Punchy</button><button class="tpl" data-p="fat">Fat</button><button class="tpl" data-p="room">Room</button></div>
-    <div class="g-faders" id="mixFaders"></div>
-  </section>
-
   <section class="bank" aria-label="Patterns">
     <span class="lbl">Pattern</span>
     <div id="pats" style="display:flex;gap:8px;flex-wrap:wrap"></div>
@@ -267,7 +261,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
       <div class="ex-col"><span class="lbl">Length</span><div class="seg" id="exBars"><button data-b="1">1 bar</button><button data-b="2">2</button><button data-b="4">4</button><button data-b="8">8</button></div></div>
       <div class="ex-btns"><button class="ex-btn" id="exMidi">MIDI file</button><button class="ex-btn" id="exWav">WAV audio</button></div>
     </div>
-    <p class="notes" id="exStatus" aria-live="polite">Exports the pattern you're on. Swing, groove, humanise, mutes and the Mix are included; the WAV is stereo. The WAV loops seamlessly: cymbal tails wrap round to the start.</p>
+    <p class="notes" id="exStatus" aria-live="polite">Exports the pattern you're on. Swing, groove, humanise and mutes are included; the WAV is stereo. The WAV loops seamlessly: cymbal tails wrap round to the start.</p>
   </section>
 
   <section class="backup" aria-label="Backup">
@@ -316,7 +310,7 @@ try{const s=JSON.parse(localStorage.getItem('rb16')||'null');if(s&&s.patterns&&s
 const GDEF={swing:50,res:16,tpl:'straight',amount:1,hTime:0,hVel:0,lockKick:false};
 state.groove={...GDEF,...(state.groove||{})};delete state.shuffle;
 const MIX_PRESETS={clean:{bass:0,punch:0,warmth:0,room:0,width:0},punchy:{bass:.35,punch:.45,warmth:.25,room:.12,width:.5},fat:{bass:.7,punch:.65,warmth:.55,room:.15,width:.6},room:{bass:.3,punch:.35,warmth:.2,room:.45,width:.8}};
-state.mix={...MIX_PRESETS.punchy,...(state.mix||{})};
+state.mix={...MIX_PRESETS.punchy};   // fixed built-in mix (no on-screen controls)
 state.mute=state.mute||{};state.solo=state.solo||{};
 VOICES.forEach(v=>{const sv=state.params[v.id]||{},o={...v.p};for(const k in v.p)if(typeof sv[k]==='number')o[k]=sv[k];state.params[v.id]=o});
 if(!state.kit909){['bd','lt','mt','ht','cp'].forEach(id=>{state.params[id]={...VOICES.find(v=>v.id===id).p,level:state.params[id].level}});state.kit909=1}
@@ -842,20 +836,7 @@ $('bkYes').onclick=async()=>{
     clearTimeout(saveT);localStorage.setItem('rb16',JSON.stringify(j.state));location.reload();
   }catch(e){$('bkStatus').textContent='The restore failed, so nothing was changed. Try again.'}
 };
-/* ---------- mix controls ---------- */
-const MIXK=[['bass','Bass'],['punch','Punch'],['warmth','Warmth'],['room','Room'],['width','Width']];
-function renderMix(){
-  const box=$('mixFaders');if(!box.children.length)MIXK.forEach(([k,n])=>{const l=document.createElement('label');l.className='fader';
-    l.innerHTML=`<span class="row"><span class="lbl">${n}</span><output id="mx-${k}-o"></output></span><input type="range" id="mx-${k}" min="0" max="100">`;box.appendChild(l);
-    l.querySelector('input').oninput=e=>{state.mix[k]=e.target.value/100;mixChanged()}});
-  MIXK.forEach(([k])=>{$('mx-'+k).value=Math.round(state.mix[k]*100);$('mx-'+k+'-o').textContent=Math.round(state.mix[k]*100)});
-  const hit=Object.entries(MIX_PRESETS).find(([,p])=>MIXK.every(([k])=>Math.abs(p[k]-state.mix[k])<.005));
-  document.querySelectorAll('#mixPresets .tpl').forEach(b=>{const on=hit&&b.dataset.p===hit[0];b.classList.toggle('on',!!on);b.setAttribute('aria-pressed',!!on)});
-  $('mixName').textContent=hit?{clean:'Clean 909',punchy:'Punchy',fat:'Fat',room:'Room'}[hit[0]]:'Custom';
-}
-function mixChanged(){if(LIVE)applyMix(LIVE);renderMix();save()}
-document.querySelectorAll('#mixPresets .tpl').forEach(b=>b.onclick=()=>{state.mix={...MIX_PRESETS[b.dataset.p]};mixChanged()});
-setBpm(state.bpm);renderGroove();renderMix();renderPats();renderVoices();renderEditor();renderMatrix();renderExport();requestAnimationFrame(draw);loadSavedSamples();startSounds();
+setBpm(state.bpm);renderGroove();renderPats();renderVoices();renderEditor();renderMatrix();renderExport();requestAnimationFrame(draw);loadSavedSamples();startSounds();
 if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'))navigator.serviceWorker.register('sw.js').catch(()=>{});
 })();
 </script>
