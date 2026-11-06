@@ -188,6 +188,26 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
     </div>
   </section>
 
+  <section class="editor" aria-label="Step editor">
+    <div class="ed-head">
+      <h2 id="edName">Bass Drum</h2>
+      <span class="lbl">Tap a key to set a step</span>
+    </div>
+    <div class="params" id="params"></div>
+    <div class="steps" id="steps"></div>
+    <div class="scale" aria-hidden="true"><span>Beat 1</span><span>Beat 2</span><span>Beat 3</span><span>Beat 4</span></div>
+  </section>
+
+  <section class="voices" id="voices" aria-label="Instruments"></section>
+
+  <section class="bank" aria-label="Patterns">
+    <span class="lbl">Pattern</span>
+    <div id="pats" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+    <span class="spacer"></span>
+    <button class="small" id="reset">Reset</button>
+    <button class="small" id="clear">Clear</button>
+  </section>
+
   <section class="groove" aria-label="Swing and groove">
     <div class="g-head"><h2>Swing &amp; Groove</h2><span class="lbl" id="feelName">Straight</span></div>
     <div class="g-row">
@@ -202,26 +222,6 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
     </div>
     <label class="check"><input type="checkbox" id="lockKick"> Keep the kick on the grid</label>
     <div class="feel" id="feel" role="img" aria-label="Where each step lands and how hard it hits"></div>
-    <div class="scale" aria-hidden="true"><span>Beat 1</span><span>Beat 2</span><span>Beat 3</span><span>Beat 4</span></div>
-  </section>
-
-  <section class="bank" aria-label="Patterns">
-    <span class="lbl">Pattern</span>
-    <div id="pats" style="display:flex;gap:8px;flex-wrap:wrap"></div>
-    <span class="spacer"></span>
-    <button class="small" id="reset">Reset</button>
-    <button class="small" id="clear">Clear</button>
-  </section>
-
-  <section class="voices" id="voices" aria-label="Instruments"></section>
-
-  <section class="editor" aria-label="Step editor">
-    <div class="ed-head">
-      <h2 id="edName">Bass Drum</h2>
-      <span class="lbl">Tap a key to set a step</span>
-    </div>
-    <div class="params" id="params"></div>
-    <div class="steps" id="steps"></div>
     <div class="scale" aria-hidden="true"><span>Beat 1</span><span>Beat 2</span><span>Beat 3</span><span>Beat 4</span></div>
   </section>
 
