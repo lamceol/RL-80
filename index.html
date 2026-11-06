@@ -355,26 +355,25 @@ function softClip(c,from,to){
 /* ---------- mix: per-drum stereo position, then bass, warmth, punch and room on the whole kit ---------- */
 const PAN={bd:0,sd:0,lt:-.45,mt:0,ht:.45,rs:-.2,cp:.12,ch:.3,oh:.3,cr:-.35,rd:.4};
 function makeIR(c,sec){const n=Math.floor(c.sampleRate*sec),b=c.createBuffer(2,n,c.sampleRate);let sd=4242;const r=()=>(sd=(Math.imul(sd,1664525)+1013904223)>>>0)/4294967296;
-  for(let ch=0;ch<2;ch++){const d=b.getChannelData(ch);let lp=0;for(let i=0;i<n;i++){const t=i/n;lp+=.35*((r()*2-1)-lp);d[i]=lp*Math.pow(1-t,3)*Math.exp(-6*t)*(i<c.sampleRate*.004?i/(c.sampleRate*.004):1)}}
+  for(let ch=0;ch<2;ch++){const d=b.getChannelData(ch);let lp=0;for(let i=0;i<n;i++){const t=i/n;lp+=.35*((r()*2-1)-lp);const pd=c.sampleRate*.022,ramp=c.sampleRate*.012;d[i]=i<pd?0:lp*Math.pow(1-t,3)*Math.exp(-6*t)*Math.min(1,(i-pd)/ramp)}}
   return b}
 function buildChain(c,dest){
   const C={c,input:c.createGain(),pan:{}};
   for(const id in PAN){const p=c.createStereoPanner?c.createStereoPanner():c.createGain();p.connect(C.input);C.pan[id]=p}
   C.bass=c.createBiquadFilter();C.bass.type='lowshelf';C.bass.frequency.value=95;
-  C.sat=c.createWaveShaper();C.sat.oversample='4x';C.satIn=c.createGain();C.satOut=c.createGain();C.dry=c.createGain();
+  C.sat=c.createWaveShaper();C.sat.oversample='4x';
   C.comp=c.createDynamicsCompressor();C.comp.attack.value=.025;C.comp.release.value=.16;C.comp.knee.value=8;C.makeup=c.createGain();
   C.rev=c.createConvolver();C.rev.buffer=makeIR(c,.9);C.revSend=c.createGain();C.revLP=c.createBiquadFilter();C.revLP.type='lowpass';C.revLP.frequency.value=6500;
   C.out=c.createGain();
-  C.input.connect(C.bass);C.bass.connect(C.dry);C.bass.connect(C.satIn);C.satIn.connect(C.sat);C.sat.connect(C.satOut);
-  C.dry.connect(C.comp);C.satOut.connect(C.comp);C.comp.connect(C.makeup);C.makeup.connect(C.out);
+  C.satIn=c.createGain();C.satIn.gain.value=.5;C.satOut=c.createGain();C.satOut.gain.value=2;
+  C.input.connect(C.bass);C.bass.connect(C.satIn);C.satIn.connect(C.sat);C.sat.connect(C.satOut);C.satOut.connect(C.comp);C.comp.connect(C.makeup);C.makeup.connect(C.out);
   C.makeup.connect(C.revSend);C.revSend.connect(C.revLP);C.revLP.connect(C.rev);C.rev.connect(C.out);
   softClip(c,C.out,dest);applyMix(C);return C;
 }
 function applyMix(C){
   const m=state.mix,t=C.c.currentTime,set=(p,v)=>p.setTargetAtTime(v,t,.02);
   set(C.bass.gain,m.bass*9);                                                    // up to +9 dB below ~95 Hz
-  const k=1+m.warmth*4,cv=new Float32Array(1025);for(let i=0;i<1025;i++){const x=i/512-1;cv[i]=Math.tanh(k*x)/Math.tanh(k)}C.sat.curve=cv;
-  set(C.satIn.gain,.6);set(C.satOut.gain,m.warmth*1.1);set(C.dry.gain,1-m.warmth*.45); // tape-style warmth, blended in
+  const w=m.warmth,d=1+w*.8,cv=new Float32Array(2049);for(let i=0;i<2049;i++){const x=(i/1024-1)*2;cv[i]=((1-w)*x+w*Math.tanh(d*x)/d)/2}C.sat.curve=cv; // tape-style warmth: same level for quiet sounds, peaks gently rounded (curve covers +/-2)
   C.comp.threshold.setTargetAtTime(-4-m.punch*20,t,.02);C.comp.ratio.setTargetAtTime(1+m.punch*4,t,.02);
   set(C.makeup.gain,Math.pow(10,(m.punch*20*(1-1/(1+m.punch*4))*.5)/20));      // keep the level roughly the same
   set(C.revSend.gain,m.room*.5);set(C.out.gain,state.volume);
