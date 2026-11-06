@@ -489,7 +489,26 @@ const SYN={
  cr(t,v,p){if(!CYM.crash)return;const rate=Math.pow(2.08,p.tune-.4);playBuf(CYM.crash,t,v*p.level*.9,{rate,len:p.decay>=.99?0:CYM.crash.duration/rate*(.2+.8*p.decay)})},
  rd(t,v,p){if(!CYM.ride)return;const rate=Math.pow(2.08,p.tune-.4);playBuf(CYM.ride,t,v*p.level*.8,{rate,len:p.decay>=.99?0:CYM.ride.duration/rate*(.2+.8*p.decay)})}
 };
+/* toms: the real 909 recordings (free Aminet TR-909 set, in samples/aminet-tr909), 16 per tom:
+   Tune 0/3/7/10 x Decay 0/3/7/10. In-between Tune nudges the pitch; in-between Decay blends the two nearest recordings */
+const REC={},RK=['0','3','7','a'];
+async function loadTomRecordings(){
+  for(const id of ['lt','mt','ht']){const set={};
+    await Promise.all(RK.flatMap(tu=>RK.map(async d=>{
+      const r=await fetch(`samples/aminet-tr909/${id}${tu}d${d}.wav`);if(!r.ok)throw 0;const b=await decode(await r.arrayBuffer());
+      const x=b.getChannelData(0);let pk=0;for(const v of x)pk=Math.max(pk,Math.abs(v));let i0=0;while(i0<x.length&&Math.abs(x[i0])<.02*pk)i0++;i0=Math.max(0,i0-3);
+      const nb=new AudioBuffer({length:x.length-i0,sampleRate:b.sampleRate,numberOfChannels:1});nb.getChannelData(0).set(x.subarray(i0));set[tu+d]=nb;   // trim the silence before the hit
+    }))).catch(()=>{});
+    if(Object.keys(set).length===16)REC[id]=set;
+  }
+}
+function playTomRecording(id,t,v,p){
+  const R=REC[id],S=META[id]&&META[id].settle,[ti,tw]=seg(p.tune),tn=tw<.5?ti:ti+1,rate=S?(S[ti]+(S[ti+1]-S[ti])*tw)/S[tn]:1;
+  const [di,dw]=seg(p.decay),bus=driveBus(t,v,p.level*.85);
+  if(dw<.999)playBuf(R[RK[tn]+RK[di]],t,1-dw,{rate,dest:bus});if(dw>.001)playBuf(R[RK[tn]+RK[di+1]],t,dw,{rate,dest:bus});
+}
 ['lt','mt','ht'].forEach(id=>{SYN[id]=(t,v,p)=>{
+  if(REC[id])return playTomRecording(id,t,v,p);
   const B=CYM[id];if(!B)return FB[id](t,v,p);
   const M=META[id],[k,s]=tunePick(M.settle,p.tune),out=decayBus(t,M,p.decay,1);
   playLive(t,M.live[k],s,v,p.level*.85,out);playBuf(B.noise,t,v*p.level*.85,{dest:out});
@@ -775,7 +794,7 @@ document.addEventListener('click',e=>{if(e.target.closest('.pat,.step,.cell,#tDo
 function renderSampleRow(v){
   $('smpRow').hidden=v.id==='ac';
   const u=samples[v.id];
-  $('smpName').textContent=u?u.name:'Built-in · modelled on a real 909';
+  $('smpName').textContent=u?u.name:['lt','mt','ht'].includes(v.id)?'Built-in · real 909 recording':'Built-in · modelled on a real 909';
   $('smpName').classList.toggle('on',!!u);$('smpClear').hidden=!u;
 }
 $('smpLoad').onclick=()=>{$('smpMsg').textContent='';$('smpFile').value='';$('smpFile').click()};
@@ -836,7 +855,7 @@ $('bkYes').onclick=async()=>{
     clearTimeout(saveT);localStorage.setItem('rb16',JSON.stringify(j.state));location.reload();
   }catch(e){$('bkStatus').textContent='The restore failed, so nothing was changed. Try again.'}
 };
-setBpm(state.bpm);renderGroove();renderPats();renderVoices();renderEditor();renderMatrix();renderExport();requestAnimationFrame(draw);loadSavedSamples();startSounds();
+setBpm(state.bpm);renderGroove();renderPats();renderVoices();renderEditor();renderMatrix();renderExport();requestAnimationFrame(draw);loadSavedSamples();startSounds();loadTomRecordings();
 if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'))navigator.serviceWorker.register('sw.js').catch(()=>{});
 })();
 </script>
