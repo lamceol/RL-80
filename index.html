@@ -153,6 +153,16 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
 
 .notes{font-size:14px;line-height:1.5;color:var(--muted);max-width:65ch;margin:0}
 .notes b{color:var(--label);font-weight:600}
+/* export */
+.export{display:grid;gap:12px;background:var(--groove);border-radius:8px;padding:14px;border:1px solid #000}
+.ex-row{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:end}
+.ex-col{display:grid;gap:6px}
+.ex-btns{display:flex;gap:10px;flex-wrap:wrap}
+.ex-btn{height:48px;min-width:132px;padding:0 18px;border-radius:8px;border:1px solid #000;background:var(--key);color:var(--key-ink);font-weight:700;font-size:16px;letter-spacing:.12em;text-transform:uppercase;box-shadow:0 3px 0 #0007}
+.ex-btn:active{transform:translateY(2px);box-shadow:0 1px 0 #0007}
+.ex-btn.ready{background:var(--lit);color:#2a1606;box-shadow:0 3px 0 #0007,0 0 14px var(--lit-glow)}
+.ex-btn:disabled{opacity:.6;cursor:progress}
+#exStatus{min-height:1.5em}
 @media (prefers-reduced-motion:reduce){.pat.queued{animation:none;outline:2px dashed var(--lit)}}
 </style>
 </head>
@@ -218,6 +228,15 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
   <section class="overview" aria-label="Whole pattern">
     <span class="lbl">Whole pattern · tap a row name to edit it</span>
     <div class="matrix" id="matrix"></div>
+  </section>
+
+  <section class="export" aria-label="Download loop">
+    <div class="g-head"><h2>Download loop</h2><span class="lbl" id="exInfo">Pattern A</span></div>
+    <div class="ex-row">
+      <div class="ex-col"><span class="lbl">Length</span><div class="seg" id="exBars"><button data-b="1">1 bar</button><button data-b="2">2</button><button data-b="4">4</button><button data-b="8">8</button></div></div>
+      <div class="ex-btns"><button class="ex-btn" id="exMidi">MIDI file</button><button class="ex-btn" id="exWav">WAV audio</button></div>
+    </div>
+    <p class="notes" id="exStatus" aria-live="polite">Exports the pattern you're on. Swing, groove and humanise are included. The WAV loops seamlessly: cymbal tails wrap round to the start.</p>
   </section>
 
   <p class="notes"><b>On iPhone:</b> tap Start once to wake the audio. If you hear nothing, flip the silent switch off and turn the volume up. Patterns and settings are saved in this browser. Tap an instrument button to hear it and select it.</p>
@@ -489,7 +508,99 @@ $('clear').onclick=e=>{const b=e.currentTarget;
   const p=state.patterns[state.pat];VOICES.forEach(v=>p[v.id]=P('................'));renderEditor();renderMatrix();save()};
 $('reset').onclick=()=>{state.patterns[state.pat]=presetPattern(state.pat);renderEditor();renderMatrix();save()};
 
-setBpm(state.bpm);renderGroove();renderPats();renderVoices();renderEditor();renderMatrix();requestAnimationFrame(draw);
+/* ---------- export: MIDI + WAV ---------- */
+const NOTE={bd:36,rs:37,sd:38,cp:39,ch:42,lt:45,oh:46,mt:47,cr:49,ht:50,rd:51};
+const isIOS=/iP(hone|ad|od)/.test(navigator.platform)||(navigator.maxTouchPoints>1&&/Mac/.test(navigator.userAgent));
+function eventsFor(bars){
+  const pat=state.patterns[state.pat],g=state.groove,sd=stepDur(),ev=[],r=()=>Math.random()*2-1;
+  for(let b=0;b<bars;b++)for(let s=0;s<16;s++){
+    const f=stepFeel(s),t0=(b*16+s)*sd,base=pat.ac[s]?.75+state.accent*.55:.72;
+    VOICES.forEach(vc=>{
+      if(vc.id==='ac'||!pat[vc.id][s])return;
+      let t=t0,v=base;
+      if(!(g.lockKick&&vc.id==='bd')){t+=f.off*sd+r()*g.hTime/1000;v*=f.vel*(1+r()*g.hVel/100)}
+      ev.push({id:vc.id,t:Math.max(0,t),v:Math.max(.05,v)});
+    });
+  }
+  return ev.sort((a,b)=>a.t-b.t);
+}
+function fileBase(bars){return `RL-80_${'ABCD'[state.pat]}-${PRESETS[state.pat].name.replace(/\s+/g,'')}_${state.bpm}bpm_${bars}bar`}
+function buildMidi(bars){
+  const PPQ=96,t16=PPQ/4,sd=stepDur(),end=bars*16*t16,ev=[];
+  eventsFor(bars).forEach(e=>{
+    const on=Math.round(e.t/sd*t16)%end,vel=Math.max(1,Math.min(127,Math.round(e.v/1.3*127))),n=NOTE[e.id];
+    ev.push([on,1,0x99,n,vel],[Math.min(on+12,end),0,0x89,n,0]);
+  });
+  ev.sort((a,b)=>a[0]-b[0]||a[1]-b[1]);
+  const vlq=n=>{const o=[n&127];while(n>>=7)o.unshift((n&127)|128);return o};
+  const txt=t=>[...t].map(c=>c.charCodeAt(0)&255);
+  const name=txt(`RL-80 pattern ${'ABCD'[state.pat]}`),us=Math.round(6e7/state.bpm);
+  let d=[0,0xFF,0x03,...vlq(name.length),...name,0,0xFF,0x51,3,us>>16&255,us>>8&255,us&255,0,0xFF,0x58,4,4,2,24,8];
+  let last=0;ev.forEach(([t,,st,n,v])=>{d.push(...vlq(t-last),st,n,v);last=t});
+  d.push(...vlq(end-last),0xFF,0x2F,0);
+  const len=d.length,head=[...txt('MThd'),0,0,0,6,0,0,0,1,0,PPQ,...txt('MTrk'),len>>>24&255,len>>16&255,len>>8&255,len&255];
+  return new Blob([new Uint8Array([...head,...d])],{type:'audio/midi'});
+}
+function encodeWav(x,sr){
+  const n=x.length,buf=new ArrayBuffer(44+n*2),dv=new DataView(buf),w=(o,t)=>{for(let i=0;i<t.length;i++)dv.setUint8(o+i,t.charCodeAt(i))};
+  w(0,'RIFF');dv.setUint32(4,36+n*2,true);w(8,'WAVE');w(12,'fmt ');dv.setUint32(16,16,true);dv.setUint16(20,1,true);dv.setUint16(22,1,true);
+  dv.setUint32(24,sr,true);dv.setUint32(28,sr*2,true);dv.setUint16(32,2,true);dv.setUint16(34,16,true);w(36,'data');dv.setUint32(40,n*2,true);
+  for(let i=0;i<n;i++){const v=Math.max(-1,Math.min(1,x[i]));dv.setInt16(44+i*2,v<0?v*0x8000:v*0x7fff,true)}
+  return new Blob([buf],{type:'audio/wav'});
+}
+async function renderWav(bars){
+  ensureAudio();
+  const sr=44100,len=bars*16*stepDur(),tail=2.2,off=new OfflineAudioContext(1,Math.ceil(sr*(len+tail)),sr);
+  const comp=off.createDynamicsCompressor();comp.threshold.value=-12;comp.ratio.value=4;comp.attack.value=.003;comp.release.value=.15;
+  const m=off.createGain();m.gain.value=state.volume;m.connect(comp);comp.connect(off.destination);
+  const keep=[ctx,master,oh];ctx=off;master=m;oh=null;
+  try{eventsFor(bars).forEach(e=>trigger(e.id,e.t,e.v))}finally{[ctx,master,oh]=keep}
+  const d=(await off.startRendering()).getChannelData(0),L=Math.round(sr*len),out=new Float32Array(L);
+  out.set(d.subarray(0,L));for(let i=L;i<d.length;i++)out[(i-L)%L]+=d[i];
+  let pk=0;for(let i=0;i<L;i++)pk=Math.max(pk,Math.abs(out[i]));
+  if(pk>.98)for(let i=0;i<L;i++)out[i]*=.98/pk;
+  return encodeWav(out,sr);
+}
+async function deliver(blob,name){
+  const file=new File([blob],name,{type:blob.type});
+  if(isIOS&&navigator.canShare&&navigator.canShare({files:[file]})){
+    try{await navigator.share({files:[file]});return 'shared'}
+    catch(e){if(e.name==='AbortError')return 'cancelled';if(e.name==='NotAllowedError')return 'needtap'}
+  }
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),15000);return 'downloaded';
+}
+let exReady=null;
+const exStatus=t=>$('exStatus').textContent=t;
+function exReport(r,name){exStatus(r==='shared'?`Sent ${name}.`:r==='cancelled'?'Cancelled.':r==='downloaded'?`Downloaded ${name}.`:'')}
+function renderExport(){
+  const b=state.exportBars||2;
+  document.querySelectorAll('#exBars button').forEach(x=>x.classList.toggle('on',+x.dataset.b===b));
+  $('exInfo').textContent=`Pattern ${'ABCD'[state.pat]} · ${state.bpm} BPM · ${b} bar${b>1?'s':''}`;
+}
+document.querySelectorAll('#exBars button').forEach(x=>x.onclick=()=>{state.exportBars=+x.dataset.b;clearReady();renderExport();save()});
+function clearReady(){exReady=null;const w=$('exWav');w.classList.remove('ready');w.textContent='WAV audio'}
+$('exMidi').onclick=async()=>{
+  const b=state.exportBars||2,name=fileBase(b)+'.mid';
+  const r=await deliver(buildMidi(b),name);exReport(r,name);
+};
+$('exWav').onclick=async()=>{
+  const w=$('exWav');
+  if(exReady){const {blob,name}=exReady;const r=await deliver(blob,name);if(r!=='needtap'){clearReady();exReport(r,name)}return}
+  const b=state.exportBars||2,name=fileBase(b)+'.wav';
+  w.disabled=true;w.textContent='Rendering…';exStatus('Recording the loop…');
+  try{
+    const blob=await renderWav(b);
+    const r=await deliver(blob,name);
+    if(r==='needtap'){exReady={blob,name};w.classList.add('ready');w.textContent='Save WAV';exStatus('Your WAV is ready. Tap Save WAV.')}
+    else{w.textContent='WAV audio';exReport(r,name)}
+  }catch(e){w.textContent='WAV audio';exStatus('The recording failed. Try again, or pick a shorter length.')}
+  finally{w.disabled=false}
+};
+['bpm','swing','gAmt','hTime','hVel','accent','volume'].forEach(id=>$(id).addEventListener('input',()=>{clearReady();renderExport()}));
+document.addEventListener('click',e=>{if(e.target.closest('.pat,.step,.cell,#tDown,#tUp,#reset,#clear,.tpl,#res button'))setTimeout(()=>{clearReady();renderExport()},0)});
+
+setBpm(state.bpm);renderGroove();renderPats();renderVoices();renderEditor();renderMatrix();renderExport();requestAnimationFrame(draw);
 })();
 </script>
 </body>
