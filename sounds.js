@@ -123,8 +123,10 @@ function kickData(){
     return y;
   });
   const g=grid(K.noise['0'][0].length,K.tgp),noise={a0:bandNoise(n,g,K.noise['0'],r),aa:bandNoise(n,g,K.noise.a,r)};
-  const mix=body[1].map((v,i)=>v+noise.a0[i]);scaleTo([...body,noise.a0,noise.aa],mix,1);
-  return{data:{body,noise},meta:{settle:K4.map(k=>K.settle[k]),decay:K4.map(k=>K.decay[k]),step:.002}};
+  const mix=body[1].map((v,i)=>v+noise.a0[i]);let pk0=0;for(const v of mix)pk0=Math.max(pk0,Math.abs(v));scaleTo([...body,noise.a0,noise.aa],mix,1);
+  const curves=K4.map(key=>{const m=K.tunes[key],g=grid(m.f0.length,K.tgp),N=Math.floor(K.dur*1000),f=new Float32Array(N),a=new Float32Array(N);
+    for(let i=0;i<N;i++){const t=i/1000;f[i]=lerpAt(g,m.f0,t);a[i]=lerpAt(g,m.A,t,-140)}return{f,a}});
+  return{data:{body,noise},meta:{settle:K4.map(k=>K.settle[k]),decay:K4.map(k=>K.decay[k]),step:.002,curves,norm:1/pk0,ph0:K4.map(k=>K.tunes[k].ph0)}};
 }
 function tomData(id){
   const T=DRUM_MODEL[id],r=prng(id.charCodeAt(0)*7),n=Math.round(T.dur*SR);

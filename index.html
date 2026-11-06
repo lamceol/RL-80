@@ -407,12 +407,28 @@ function startSounds(){
 }
 function inPage(got){const sc=document.createElement('script');sc.src='sounds.js';sc.onload=()=>window.RL80_BUILD(got);document.head.appendChild(sc)}
 function kitStatus(){$('kitStatus').textContent=soundsLeft>0?`Rhythm Box · building sounds… ${11-soundsLeft}/11`:'Rhythm Box · 11 voices modelled on a real 909'}
+/* kick output stage: clean at normal level; accented hits push into soft saturation (a little thicker), as on the 909 */
+const KICK_SAT=(()=>{const c=new Float32Array(1025);for(let i=0;i<1025;i++){const X=(i/512-1)*1.4,a=Math.abs(X);c[i]=Math.sign(X)*(a<.8?a:.8+.4*Math.tanh((a-.8)/.4))}return c})();
 const SYN={
- bd(t,v,p){
+ bd(t,v,p){ // 909 kick, generated live from the real unit's measured pitch and loudness curves
   const B=CYM.bd;if(!B)return FB.bd(t,v,p);
-  const M=META.bd,[k,rate]=tunePick(M.settle,p.tune),g=v*p.level*.95,out=decayBus(t,M,p.decay,rate);
-  playBuf(B.body[k],t,g,{rate,dest:out});
-  const a=p.attack;if(a<.999)playBuf(B.noise.a0,t,g*Math.sqrt(1-a),{dest:out});if(a>.001)playBuf(B.noise.aa,t,g*Math.sqrt(a),{dest:out});
+  const M=META.bd,[i,w]=seg(p.tune),A=M.curves[i],Bc=M.curves[i+1],N=Math.min(A.f.length,Bc.f.length);
+  const dc=M.decay,[j,wd]=seg(p.decay),da=dc[j],db=dc[j+1];
+  const fr=new Float32Array(N),gn=new Float32Array(N);
+  for(let k=0;k<N;k++){
+    fr[k]=A.f[k]+(Bc.f[k]-A.f[k])*w;                                    // pitch: blend of the two nearest measured Tune settings
+    const lvl=A.a[k]+(Bc.a[k]-A.a[k])*w;                                 // loudness (dB)
+    const q=Math.min(da.length-1,Math.floor(k/2)),dd=da[q]+(db[q]-da[q])*wd; // Decay knob: measured loudness curve
+    gn[k]=Math.pow(10,(lvl+dd)/20)*M.norm;
+  }
+  const dur=N/1000,o=ctx.createOscillator(),env=ctx.createGain(),drive=ctx.createGain(),sh=ctx.createWaveShaper(),out=ctx.createGain();
+  const ph=M.ph0[w<.5?i:i+1];o.setPeriodicWave(ctx.createPeriodicWave(new Float32Array([0,Math.cos(ph)]),new Float32Array([0,-Math.sin(ph)]),{disableNormalization:true}));  // start where the real kick's cycle starts
+  o.frequency.setValueCurveAtTime(fr,t,dur);env.gain.setValueCurveAtTime(gn,t,dur);
+  // accent drives the output stage harder (slightly more harmonics), as on the 909; Level sets the volume after it
+  drive.gain.value=v/1.4;sh.curve=KICK_SAT;out.gain.value=p.level*.95;
+  o.connect(env);env.connect(drive);drive.connect(sh);sh.connect(out);out.connect(master);o.start(t);o.stop(t+dur+.01);
+  const g=v*p.level*.95,nb=decayBus(t,M,p.decay,1),at=p.attack;                                 // measured click, blended by Attack
+  if(at<.999)playBuf(B.noise.a0,t,g*Math.sqrt(1-at),{dest:nb});if(at>.001)playBuf(B.noise.aa,t,g*Math.sqrt(at),{dest:nb});
  },
  sd(t,v,p){ // body measured per Tune, snare wires measured per Tone
   const B=CYM.sd;if(!B)return;
