@@ -436,7 +436,7 @@ function startSounds(){
   catch(e){inPage(got)}
 }
 function inPage(got){const sc=document.createElement('script');sc.src='sounds.js';sc.onload=()=>window.RL80_BUILD(got);document.head.appendChild(sc)}
-function kitStatus(){$('kitStatus').textContent=!recDone?'Rhythm Box · loading 909 recordings…':Object.keys(REC).length===11?'Rhythm Box · real 909 recordings':'Rhythm Box · some 909 recordings missing, using rebuilt sounds'}
+function kitStatus(){$('kitStatus').textContent=(!recDone?`Loading 909 recordings… ${recLoaded}/151`:Object.keys(REC).length===11?'Rhythm Box · real 909 recordings':`Rhythm Box · only ${Object.keys(REC).length}/11 drums loaded, rest rebuilt`)+` · ${APP_VERSION}`}
 /* kick output stage: clean at normal level; accented hits push into soft saturation (a little thicker), as on the 909 */
 const KICK_SAT=(()=>{const c=new Float32Array(1025);for(let i=0;i<1025;i++){const X=(i/512-1)*1.4,a=Math.abs(X);c[i]=Math.sign(X)*(a<.8?a:.8+.4*Math.tanh((a-.8)/.4))}return c})();
 /* plays a drum body live: one oscillator per measured tone, each following its measured pitch and loudness.
@@ -491,7 +491,8 @@ const SYN={
 };
 /* every drum plays the real 909 recordings from the free Aminet TR-909 set (samples/aminet-tr909).
    Knobs pick the nearest recordings and blend between them; the rebuilt sounds stand in until they have loaded */
-let recDone=false;
+const APP_VERSION='v22';
+let recDone=false,recLoaded=0;
 const REC={},RK=['0','3','7','a'],R6=['0','2','4','6','8','a'];
 const kickName=(tu,at,d)=>tu==='0'&&at==='0'&&d==='7'?'bt0a0a7':`bt${tu}a${at}d${d}`;   // that one file has a different name in the set
 const snareName=(tu,to,sn)=>sn==='0'?`st${tu}t0s0`:`st${tu}t${to}s${sn}`;
@@ -507,7 +508,8 @@ async function loadRecordings(){
     await Promise.all(RECSETS[id].map(async n=>{
       const r=await fetch(`samples/aminet-tr909/${n}.wav`);if(!r.ok)throw 0;const b=await decode(await r.arrayBuffer());
       const x=b.getChannelData(0);let pk=0;for(const v of x)pk=Math.max(pk,Math.abs(v));let i0=0;while(i0<x.length&&Math.abs(x[i0])<.02*pk)i0++;i0=Math.max(0,i0-3);
-      const nb=new AudioBuffer({length:x.length-i0,sampleRate:b.sampleRate,numberOfChannels:1});nb.getChannelData(0).set(x.subarray(i0));set[n]=nb;   // trim the silence before the hit
+      let nb;try{nb=new AudioBuffer({length:x.length-i0,sampleRate:b.sampleRate,numberOfChannels:1})}catch(e){nb=decodeCtx.createBuffer(1,x.length-i0,b.sampleRate)}
+      nb.getChannelData(0).set(x.subarray(i0));set[n]=nb;recLoaded++;kitStatus();   // trim the silence before the hit
     })).catch(()=>{});
     if(Object.keys(set).length===RECSETS[id].length)REC[id]=set;
   }
@@ -883,7 +885,11 @@ $('bkYes').onclick=async()=>{
   }catch(e){$('bkStatus').textContent='The restore failed, so nothing was changed. Try again.'}
 };
 setBpm(state.bpm);renderGroove();renderPats();renderVoices();renderEditor();renderMatrix();renderExport();requestAnimationFrame(draw);loadSavedSamples();startSounds();loadRecordings();
-if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'))navigator.serviceWorker.register('sw.js').catch(()=>{});
+if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){
+  const had=!!navigator.serviceWorker.controller;let reloaded=false;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had&&!reloaded&&!playing){reloaded=true;location.reload()}});   // a new version arrived: show it now
+  navigator.serviceWorker.register('sw.js').then(r=>r.update()).catch(()=>{});
+}
 })();
 </script>
 </body>
