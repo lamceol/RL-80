@@ -1,9 +1,5 @@
 # RL-80
 
-Music projects by RL-80.
-
-## RB-16 Drum Machine
-
 A 16-step drum machine that runs in the browser, inspired by 80s rhythm machines.
 All 11 drum sounds are synthesised live with the Web Audio API (no samples).
 
