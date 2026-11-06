@@ -409,6 +409,20 @@ function inPage(got){const sc=document.createElement('script');sc.src='sounds.js
 function kitStatus(){$('kitStatus').textContent=soundsLeft>0?`Rhythm Box · building sounds… ${11-soundsLeft}/11`:'Rhythm Box · 11 voices modelled on a real 909'}
 /* kick output stage: clean at normal level; accented hits push into soft saturation (a little thicker), as on the 909 */
 const KICK_SAT=(()=>{const c=new Float32Array(1025);for(let i=0;i<1025;i++){const X=(i/512-1)*1.4,a=Math.abs(X);c[i]=Math.sign(X)*(a<.8?a:.8+.4*Math.tanh((a-.8)/.4))}return c})();
+/* plays a drum body live: one oscillator per measured tone, each following its measured pitch and loudness.
+   s shifts the pitch for in-between Tune settings without changing the length; accent drives the output stage */
+const WAVES=new WeakMap();
+function waveFor(ph){let m=WAVES.get(ctx);if(!m){m=new Map();WAVES.set(ctx,m)}let w=m.get(ph);
+  if(!w){w=ctx.createPeriodicWave(new Float32Array([0,Math.sin(ph)]),new Float32Array([0,Math.cos(ph)]),{disableNormalization:true});m.set(ph,w)}return w}
+function playLive(t,L,s,v,level,dest){
+  const N=L.f.length,dur=N/1000,sum=ctx.createGain(),drive=ctx.createGain(),sh=ctx.createWaveShaper(),out=ctx.createGain();
+  drive.gain.value=v/1.4;sh.curve=KICK_SAT;out.gain.value=level;sum.connect(drive);drive.connect(sh);sh.connect(out);out.connect(dest||master);
+  for(let k=0;k<L.r.length;k++){
+    const o=ctx.createOscillator(),g=ctx.createGain(),fr=new Float32Array(N),rk=L.r[k]*s;for(let i=0;i<N;i++)fr[i]=L.f[i]*rk;
+    o.setPeriodicWave(waveFor(L.ph[k]));o.frequency.setValueCurveAtTime(fr,t,dur);g.gain.setValueCurveAtTime(L.g[k],t,dur);
+    o.connect(g);g.connect(sum);o.start(t);o.stop(t+dur+.01);
+  }
+}
 const SYN={
  bd(t,v,p){ // 909 kick, generated live from the real unit's measured pitch and loudness curves
   const B=CYM.bd;if(!B)return FB.bd(t,v,p);
@@ -430,10 +444,10 @@ const SYN={
   const g=v*p.level*.95,nb=decayBus(t,M,p.decay,1),at=p.attack;                                 // measured click, blended by Attack
   if(at<.999)playBuf(B.noise.a0,t,g*Math.sqrt(1-at),{dest:nb});if(at>.001)playBuf(B.noise.aa,t,g*Math.sqrt(at),{dest:nb});
  },
- sd(t,v,p){ // body measured per Tune, snare wires measured per Tone
+ sd(t,v,p){ // body generated live from the measured tones (Tune shifts pitch only); snare wires measured per Tone
   const B=CYM.sd;if(!B)return;
-  const [k,rate]=tunePick(META.sd.settle,p.tune),g=v*p.level*.9;playBuf(B.body[k],t,g,{rate});
-  const [j,w2]=seg(p.tone),sp=[0,.5662,1,1.279],[q,w3]=seg(p.snappy),amp=Math.sqrt(sp[q]+(sp[q+1]-sp[q])*w3);
+  const M=META.sd,[k,s]=tunePick(M.settle,p.tune);playLive(t,M.live[k],s,v,p.level*.9);
+  const g=v*p.level*.9,[j,w2]=seg(p.tone),sp=[0,.5662,1,1.279],[q,w3]=seg(p.snappy),amp=Math.sqrt(sp[q]+(sp[q+1]-sp[q])*w3);
   if(amp>.001){if(w2<.999)playBuf(B.noise[j],t,g*amp*Math.sqrt(1-w2));if(w2>.001)playBuf(B.noise[j+1],t,g*amp*Math.sqrt(w2))}
  },
  rs(t,v,p){if(!CYM.rs)return FB.rs(t,v,p);playBuf(CYM.rs,t,v*p.level*.85)},
@@ -445,8 +459,8 @@ const SYN={
 };
 ['lt','mt','ht'].forEach(id=>{SYN[id]=(t,v,p)=>{
   const B=CYM[id];if(!B)return FB[id](t,v,p);
-  const M=META[id],[k,rate]=tunePick(M.settle,p.tune),g=v*p.level*.85,out=decayBus(t,M,p.decay,rate);
-  playBuf(B.body[k],t,g,{rate,dest:out});playBuf(B.noise,t,g,{dest:out});
+  const M=META[id],[k,s]=tunePick(M.settle,p.tune),out=decayBus(t,M,p.decay,1);
+  playLive(t,M.live[k],s,v,p.level*.85,out);playBuf(B.noise,t,v*p.level*.85,{dest:out});
 }});
 function playBuf(buf,t,peak,{rate=1,len=0,dest}={}){
   const src=ctx.createBufferSource();src.buffer=buf;src.playbackRate.value=rate;
