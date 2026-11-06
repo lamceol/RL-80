@@ -150,13 +150,12 @@ function tomData(id){
     TPH.push(bp);return best;
   });
   const noise=bandNoise(n,grid(T.noise[0].length,T.ntgp),T.noise,r);
-  attack([...body,noise],T.atk);
   const mix=body[1].map((v,i)=>v+noise[i]);let pk=0;for(const v of mix)pk=Math.max(pk,Math.abs(v));const sc=1/(pk||1);scaleTo([...body,noise],mix,1);
   const NA=T.atk.length,N=Math.floor(T.dur*1000);
   const live=K4.map((key,ki)=>{
     const m=T.tunes[key],g=grid(m.f0.length,T.tgp),f=new Float32Array(N),gs=m.ratios.map(()=>new Float32Array(N));
     const C=T.corr[key],cg=t=>{const x=t/.005-.5,j=Math.max(0,Math.min(C.length-2,Math.floor(x))),u=Math.max(0,Math.min(1,x-j));return Math.pow(10,(C[j]+(C[j+1]-C[j])*u)/20)};
-    for(let i=0;i<N;i++){const t=i/1000,a=(i<NA?Math.pow(10,T.atk[i]/20):1)*cg(t);f[i]=lerpAt(g,m.f0,t);for(let k=0;k<m.ratios.length;k++)gs[k][i]=Math.pow(10,lerpAt(g,m.env[k],t,-140)/20)*a*sc}
+    for(let i=0;i<N;i++){const t=i/1000,a=cg(t);f[i]=lerpAt(g,m.f0,t);for(let k=0;k<m.ratios.length;k++)gs[k][i]=Math.pow(10,lerpAt(g,m.env[k],t,-140)/20)*a*sc}
     return{f,r:m.ratios,g:gs,ph:TPH[ki]};
   });
   return{data:{noise},meta:{settle:K4.map(k=>T.settle[k]),decay:K4.map(k=>T.decay[k]),step:.002,live}};

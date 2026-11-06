@@ -411,6 +411,8 @@ function kitStatus(){$('kitStatus').textContent=soundsLeft>0?`Rhythm Box · buil
 const KICK_SAT=(()=>{const c=new Float32Array(1025);for(let i=0;i<1025;i++){const X=(i/512-1)*1.4,a=Math.abs(X);c[i]=Math.sign(X)*(a<.8?a:.8+.4*Math.tanh((a-.8)/.4))}return c})();
 /* plays a drum body live: one oscillator per measured tone, each following its measured pitch and loudness.
    s shifts the pitch for in-between Tune settings without changing the length; accent drives the output stage */
+/* accent stage shared by rimshot and clap: clean at normal level, accented hits push into soft saturation */
+function driveBus(t,v,level){const drive=ctx.createGain(),sh=ctx.createWaveShaper(),out=ctx.createGain();drive.gain.value=v/1.4;sh.curve=KICK_SAT;out.gain.value=level;drive.connect(sh);sh.connect(out);out.connect(master);return drive}
 const WAVES=new WeakMap();
 function waveFor(ph){let m=WAVES.get(ctx);if(!m){m=new Map();WAVES.set(ctx,m)}let w=m.get(ph);
   if(!w){w=ctx.createPeriodicWave(new Float32Array([0,Math.sin(ph)]),new Float32Array([0,Math.cos(ph)]),{disableNormalization:true});m.set(ph,w)}return w}
@@ -450,8 +452,8 @@ const SYN={
   const g=v*p.level*.9,[j,w2]=seg(p.tone),sp=[0,.5662,1,1.279],[q,w3]=seg(p.snappy),amp=Math.sqrt(sp[q]+(sp[q+1]-sp[q])*w3);
   if(amp>.001){if(w2<.999)playBuf(B.noise[j],t,g*amp*Math.sqrt(1-w2));if(w2>.001)playBuf(B.noise[j+1],t,g*amp*Math.sqrt(w2))}
  },
- rs(t,v,p){if(!CYM.rs)return FB.rs(t,v,p);playBuf(CYM.rs,t,v*p.level*.85)},
- cp(t,v,p){if(!CYM.cp)return FB.cp(t,v,p);const d=CYM.cp.duration;playBuf(CYM.cp,t,v*p.level*.9,{len:p.decay>=.99?0:d*(.25+.75*p.decay)})},
+ rs(t,v,p){if(!CYM.rs)return FB.rs(t,v,p);playBuf(CYM.rs,t,1,{dest:driveBus(t,v,p.level*.85)})},
+ cp(t,v,p){if(!CYM.cp)return FB.cp(t,v,p);const d=CYM.cp.duration;playBuf(CYM.cp,t,1,{len:p.decay>=.99?0:d*(.25+.75*p.decay),dest:driveBus(t,v,p.level*.9)})},
  ch(t,v,p){if(!CYM.ch)return;choke(t);playBuf(CYM.ch,t,v*p.level*.9,{rate:.85+p.tune*.3,len:p.decay>=.99?0:.05+p.decay*.1})},
  oh(t,v,p){if(!CYM.oh)return;choke(t);const rate=.85+p.tune*.3,len=p.decay>=.99?CYM.oh.duration/rate:.22+p.decay*.32;oh={g:playBuf(CYM.oh,t,v*p.level*.9,{rate,len:p.decay>=.99?0:len}),end:t+len}},
  cr(t,v,p){if(!CYM.crash)return;const rate=Math.pow(2.08,p.tune-.4);playBuf(CYM.crash,t,v*p.level*.9,{rate,len:p.decay>=.99?0:CYM.crash.duration/rate*(.2+.8*p.decay)})},
