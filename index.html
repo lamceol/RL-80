@@ -208,6 +208,44 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
 .ex-btn.ready{background:var(--lit);color:#2a1606;box-shadow:0 3px 0 #0007,0 0 14px var(--lit-glow)}
 .ex-btn:disabled{opacity:.6;cursor:progress}
 @media (prefers-reduced-motion:reduce){.pat.queued{animation:none;outline:2px dashed var(--lit)}}
+
+/* ---------- hardware look: raised keys, LEDs, recessed panels, screws ---------- */
+:root{--dkey:linear-gradient(180deg,#3d4648,#2a3133);--dkey-sh:0 2px 0 #000,inset 0 1px 0 rgba(255,255,255,.09)}
+.unit{background:
+  radial-gradient(circle,#a3aaa8 0 1.4px,#5d6768 1.9px 3.6px,#121617 4.1px 4.7px,transparent 5.2px) 4px 4px/11px 11px no-repeat,
+  radial-gradient(circle,#a3aaa8 0 1.4px,#5d6768 1.9px 3.6px,#121617 4.1px 4.7px,transparent 5.2px) calc(100% - 4px) 4px/11px 11px no-repeat,
+  radial-gradient(circle,#a3aaa8 0 1.4px,#5d6768 1.9px 3.6px,#121617 4.1px 4.7px,transparent 5.2px) 4px calc(100% - 4px)/11px 11px no-repeat,
+  radial-gradient(circle,#a3aaa8 0 1.4px,#5d6768 1.9px 3.6px,#121617 4.1px 4.7px,transparent 5.2px) calc(100% - 4px) calc(100% - 4px)/11px 11px no-repeat,
+  repeating-linear-gradient(90deg,rgba(255,255,255,.014) 0 1px,transparent 1px 3px),
+  linear-gradient(180deg,#323b3d,#242b2d);
+  box-shadow:0 24px 60px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.08),inset 0 -2px 0 rgba(0,0,0,.35)}
+.brand{border-bottom:0;padding-bottom:15px;background:linear-gradient(90deg,var(--led) 0 33.3%,var(--lit) 33.3% 66.6%,#ffc23a 66.6%) left bottom/100% 3px no-repeat}
+.legend{display:flex;align-items:center;gap:10px;font-size:11px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);margin-bottom:-8px}
+.legend::after{content:"";flex:1;height:1px;background:var(--edge)}
+.editor,.groove,.save{box-shadow:inset 0 2px 8px rgba(0,0,0,.55),0 1px 0 rgba(255,255,255,.05)}
+.play{background:linear-gradient(180deg,#f2ecdc,#dcd4be);box-shadow:0 3px 0 #000a,inset 0 1px 0 rgba(255,255,255,.7),inset 0 -2px 0 rgba(0,0,0,.12)}
+.play:disabled{opacity:1;background:linear-gradient(180deg,#cfc8b4,#bcb5a0);color:rgba(58,58,51,.38);box-shadow:0 3px 0 #000a,inset 0 1px 0 rgba(255,255,255,.35)}
+/* drum keys: raised dark keys with an LED bar (orange = selected, red = playing) */
+.voice{background:var(--dkey);box-shadow:0 3px 0 #000,inset 0 1px 0 rgba(255,255,255,.09);padding-top:9px}
+.voice::after{top:7px;right:auto;left:50%;transform:translateX(-50%);width:18px;height:4px;border-radius:2px;background:#3a2622;box-shadow:inset 0 1px 1px #0008}
+.voice.sel{border-color:#000;box-shadow:0 3px 0 #000,inset 0 1px 0 rgba(255,255,255,.09)}
+.voice.sel::after{background:var(--lit);box-shadow:0 0 7px var(--lit)}
+.voice.hit::after{background:var(--led);box-shadow:0 0 7px var(--led)}
+.voice.soloed{box-shadow:0 3px 0 #000,inset 0 0 0 2px var(--led)}
+.voice.down{transform:translateY(2px);background:linear-gradient(180deg,#ff9d3a,#ee7b12);box-shadow:0 1px 0 #000,0 0 14px var(--lit-glow)}
+/* secondary keys */
+.small,.tgl{background:var(--dkey);border:1px solid #000;color:var(--label);box-shadow:var(--dkey-sh);border-radius:5px}
+.small.warn{border-color:#000;color:var(--led)}
+.small:active,.tgl:active,.tpl:active,.pat:active{transform:translateY(1px);box-shadow:0 1px 0 #000}
+.pat{background:var(--dkey);box-shadow:0 3px 0 #000,inset 0 1px 0 rgba(255,255,255,.09)}
+.pat.on{background:linear-gradient(180deg,#ffa043,#f2800f);box-shadow:0 3px 0 #000,0 0 14px var(--lit-glow)}
+.tpl{border-radius:5px;border:1px solid #000;background:var(--dkey);box-shadow:var(--dkey-sh)}
+.tpl.on{border-color:#000;background:linear-gradient(180deg,#ffa043,#f2800f);box-shadow:0 2px 0 #000,0 0 12px var(--lit-glow)}
+.seg{box-shadow:0 2px 0 #000}
+.check input{-webkit-appearance:none;appearance:none;border-radius:5px;border:1px solid #000;background:var(--dkey);box-shadow:var(--dkey-sh);position:relative;cursor:pointer}
+.check input::after{content:"";position:absolute;inset:7px;border-radius:2px;background:#3a2622}
+.check input:checked::after{background:var(--lit);box-shadow:0 0 7px var(--lit)}
+.tip{border-radius:6px;box-shadow:inset 0 2px 8px rgba(0,0,0,.5)}
 </style>
 </head>
 <body>
@@ -240,6 +278,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
     </div>
   </section>
 
+  <div class="legend" aria-hidden="true">Instruments · tap to play</div>
   <section class="voices" id="voices" aria-label="Instruments"></section>
 
   <section class="tip" id="tip" aria-label="Quick start" hidden>
@@ -531,7 +570,7 @@ const SYN={
 };
 /* every drum plays the real 909 recordings from the free Aminet TR-909 set (samples/aminet-tr909).
    Knobs pick the nearest recordings and blend between them; the rebuilt sounds stand in until they have loaded */
-const APP_VERSION='v30';
+const APP_VERSION='v31';
 let recDone=false,recLoaded=0;
 const REC={},RK=['0','3','7','a'],R6=['0','2','4','6','8','a'];
 const kickName=(tu,at,d)=>tu==='0'&&at==='0'&&d==='7'?'bt0a0a7':`bt${tu}a${at}d${d}`;   // that one file has a different name in the set
