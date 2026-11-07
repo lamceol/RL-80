@@ -130,6 +130,13 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
 @media (max-width:520px){.smp-btns{flex-basis:100%}.smp-btns .small{flex:1}}
 .smp-row .notes:empty{display:none}
 .voice.smp span{color:var(--lit)}
+.padgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.pad{height:clamp(64px,17vw,96px);border-radius:8px;border:1px solid #000;background:var(--edge);box-shadow:0 3px 0 #0008;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;line-height:1;touch-action:none;-webkit-tap-highlight-color:transparent}
+.pad.wide{grid-column:span 2}
+.pad b{font-size:20px;letter-spacing:.06em}
+.pad span{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;padding:0 3px}
+.pad.down{background:var(--lit);color:#2a1606;box-shadow:0 0 16px var(--lit-glow);transform:translateY(2px)}
+.pad.down span{color:#2a1606}
 .voice.muted{opacity:.4}.voice.muted b{text-decoration:line-through}
 .voice.soloed{box-shadow:inset 0 0 0 2px var(--led)}
 .voice .ms{position:absolute;top:4px;left:6px;font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--led)}
@@ -233,6 +240,11 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
     <button class="small" id="clear">Clear</button>
   </section>
 
+  <section class="pads" aria-label="Drum pads">
+    <div class="g-head"><h2>Pads</h2><span class="lbl">Tap to play · no need to press Start</span></div>
+    <div class="padgrid" id="pads"></div>
+  </section>
+
   <section class="groove" aria-label="Swing and groove">
     <div class="g-head"><h2>Swing &amp; Groove</h2><span class="lbl" id="feelName">Straight</span></div>
     <div class="g-row">
@@ -271,7 +283,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
     <p class="notes" id="bkStatus" aria-live="polite">Saves one file with all four patterns, every setting and any samples you've loaded. Keep it in Files or iCloud Drive.</p>
   </section>
 
-  <p class="notes"><b>On iPhone:</b> tap Start once to wake the audio. If you hear nothing, flip the silent switch off and turn the volume up. Patterns and settings are saved on this phone; use Backup to keep a copy. Works offline once it has loaded. Tap an instrument button to hear it and select it.</p>
+  <p class="notes"><b>On iPhone:</b> tap Start once to wake the audio. If you hear nothing, flip the silent switch off and turn the volume up. Patterns and settings are saved on this phone; use Backup to keep a copy. Works offline once it has loaded. Tap a pad to jam (no need to press Start). Tap an instrument button to hear it and select it.</p>
 </main>
 
 <script>
@@ -491,7 +503,7 @@ const SYN={
 };
 /* every drum plays the real 909 recordings from the free Aminet TR-909 set (samples/aminet-tr909).
    Knobs pick the nearest recordings and blend between them; the rebuilt sounds stand in until they have loaded */
-const APP_VERSION='v22';
+const APP_VERSION='v23';
 let recDone=false,recLoaded=0;
 const REC={},RK=['0','3','7','a'],R6=['0','2','4','6','8','a'];
 const kickName=(tu,at,d)=>tu==='0'&&at==='0'&&d==='7'?'bt0a0a7':`bt${tu}a${at}d${d}`;   // that one file has a different name in the set
@@ -667,7 +679,24 @@ function renderVoices(){
     b.onclick=()=>{state.sel=v.id;if(v.id!=='ac'){ensureAudio();trigger(v.id,ctx.currentTime+.01,.85)}renderVoices();renderEditor();renderMatrix();save()};
     box.appendChild(b);
   });
+  labelPads();
 }
+/* live pads: sound starts on touch-down (not on release, as a click would), several fingers at once */
+const PADS=[['cr'],['rd'],['oh'],['ch'],['lt'],['mt'],['ht'],['cp'],['bd',1],['sd'],['rs']];
+function renderPads(){
+  const box=$('pads');
+  PADS.forEach(([id,wide])=>{const v=VOICES.find(x=>x.id===id),b=document.createElement('button');
+    b.type='button';b.className='pad'+(wide?' wide':'');b.dataset.id=id;b.innerHTML=`<b>${v.short}</b><span></span>`;box.appendChild(b)});
+  const hit=b=>{trigger(b.dataset.id,ctx.currentTime,.85);b.classList.add('down');clearTimeout(b._t);b._t=setTimeout(()=>b.classList.remove('down'),110)};
+  box.addEventListener('pointerdown',e=>{const b=e.target.closest('.pad');if(!b)return;e.preventDefault();
+    ensureAudio();if(ctx.state==='running'){hit(b)}else{b._wait=true}});
+  // phones only let the audio start on a finger lift, so the very first tap plays when lifted
+  box.addEventListener('pointerup',e=>{const b=e.target.closest('.pad');if(b&&b._wait){b._wait=false;ensureAudio();hit(b)}});
+  box.addEventListener('click',e=>{const b=e.target.closest('.pad');if(b&&e.detail===0){ensureAudio();hit(b)}});   // keyboard
+  box.addEventListener('contextmenu',e=>e.preventDefault());
+  labelPads();
+}
+function labelPads(){document.querySelectorAll('.pad').forEach(b=>{const v=VOICES.find(x=>x.id===b.dataset.id);b.querySelector('span').textContent=samples[v.id]?'Sample':v.name})}
 function renderEditor(){
   const v=VOICES.find(x=>x.id===state.sel),pat=state.patterns[state.pat][v.id];
   $('edName').innerHTML=`${v.name} <em>· ${'ABCD'[state.pat]}</em>`;
@@ -884,7 +913,7 @@ $('bkYes').onclick=async()=>{
     clearTimeout(saveT);localStorage.setItem('rb16',JSON.stringify(j.state));location.reload();
   }catch(e){$('bkStatus').textContent='The restore failed, so nothing was changed. Try again.'}
 };
-setBpm(state.bpm);renderGroove();renderPats();renderVoices();renderEditor();renderMatrix();renderExport();requestAnimationFrame(draw);loadSavedSamples();startSounds();loadRecordings();
+setBpm(state.bpm);renderGroove();renderPats();renderPads();renderVoices();renderEditor();renderMatrix();renderExport();requestAnimationFrame(draw);loadSavedSamples();startSounds();loadRecordings();
 if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){
   const had=!!navigator.serviceWorker.controller;let reloaded=false;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had&&!reloaded&&!playing){reloaded=true;location.reload()}});   // a new version arrived: show it now
