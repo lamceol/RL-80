@@ -7,8 +7,7 @@ between the recorded knob positions. While they load, sounds rebuilt from measur
 the same recordings (`sounds.js`, in a background worker) stand in.
 
 - 11 voices: kick, snare, three toms, rimshot, clap, closed and open hats, crash, ride
-- 909-style knobs: kick Tune / Attack / Decay, snare Tune / Tone / Snappy, toms Tune / Decay
-- Drum pads you can play live, with or without the sequencer running; Rec saves your taps into the pattern
+- Play the drums live by tapping them, with or without the sequencer running; Rec saves your taps into the pattern
 - 16-step sequencer, accent track, four pattern banks
 - Swing (16ths or 8ths), groove templates, groove amount and humanise
 - Built-in mix: a little extra bass, punch, warmth and room, in stereo

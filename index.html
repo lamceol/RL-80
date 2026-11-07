@@ -46,6 +46,9 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--lit);outline-of
 /* transport */
 .transport{display:grid;grid-template-columns:auto 1fr;gap:14px 18px;align-items:center}
 .play{min-width:110px;height:56px;border-radius:8px;border:1px solid #000;background:var(--key);color:var(--key-ink);font-weight:700;font-size:18px;letter-spacing:.14em;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 3px 0 #0007}
+.tbtns{display:flex;gap:8px}
+.play.rec{min-width:76px}
+.play.rec[aria-pressed="true"]{background:var(--led);color:#1a0806;box-shadow:0 0 14px rgba(255,61,46,.5)}
 .play .dot{width:10px;height:10px;border-radius:50%;background:#5a2a24}
 .play[aria-pressed="true"] .dot{background:var(--led);box-shadow:0 0 10px var(--led)}
 .play:active{transform:translateY(2px);box-shadow:0 1px 0 #0007}
@@ -106,8 +109,8 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
 .small.warn{border-color:var(--led);color:var(--led)}
 
 /* voices */
-.voices{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
-.voice{height:48px;border-radius:6px;border:1px solid #000;background:var(--panel-2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;line-height:1;position:relative}
+.voices{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.voice{height:56px;touch-action:none;-webkit-tap-highlight-color:transparent;border-radius:6px;border:1px solid #000;background:var(--panel-2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;line-height:1;position:relative}
 .voice b{font-size:17px;letter-spacing:.06em}
 .voice span{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;padding:0 3px}
 .voice::after{content:"";position:absolute;top:6px;right:6px;width:6px;height:6px;border-radius:50%;background:#3a2622}
@@ -122,7 +125,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
 .ed-head h2 em{font-style:normal;color:var(--lit)}
 .params{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px 18px}
 .params:empty{display:none}
-.smp-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;border-top:1px solid var(--edge);padding-top:12px}
+.smp-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;border-top:1px solid var(--edge);padding-top:12px;min-height:49px}
 .smp-name{flex:1;min-width:0;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .smp-name.on{color:var(--lit)}
 .smp-btns{display:flex;gap:8px}
@@ -130,13 +133,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
 @media (max-width:520px){.smp-btns{flex-basis:100%}.smp-btns .small{flex:1}}
 .smp-row .notes:empty{display:none}
 .voice.smp span{color:var(--lit)}
-.padgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
-.pad{height:clamp(64px,17vw,96px);border-radius:8px;border:1px solid #000;background:var(--edge);box-shadow:0 3px 0 #0008;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;line-height:1;touch-action:none;-webkit-tap-highlight-color:transparent}
-.pad.wide{grid-column:span 2}
-.pad b{font-size:20px;letter-spacing:.06em}
-.pad span{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;padding:0 3px}
-.pad.down{background:var(--lit);color:#2a1606;box-shadow:0 0 16px var(--lit-glow);transform:translateY(2px)}
-.pad.down span{color:#2a1606}
+.voice.down{background:var(--lit);color:#2a1606}.voice.down b,.voice.down span{color:#2a1606}
 .voice.muted{opacity:.4}.voice.muted b{text-decoration:line-through}
 .voice.soloed{box-shadow:inset 0 0 0 2px var(--led)}
 .voice .ms{position:absolute;top:4px;left:6px;font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--led)}
@@ -201,7 +198,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
   </header>
 
   <section class="transport" aria-label="Transport">
-    <button class="play" id="play" aria-pressed="false"><span class="dot"></span><span id="playTxt">Start</span></button>
+    <div class="tbtns"><button class="play" id="play" aria-pressed="false"><span class="dot"></span><span id="playTxt">Start</span></button><button class="play rec" id="recBtn" aria-pressed="false" aria-label="Record taps into the pattern">Rec</button></div>
     <div class="tempo">
       <button class="nudge" id="tDown" aria-label="Tempo down">−</button>
       <div class="lcd" id="bpmLcd" aria-live="polite">125.0<small>BPM</small></div>
@@ -219,9 +216,8 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
       <h2 id="edName">Bass Drum</h2>
       <span class="ed-tools"><button class="tgl" id="muteBtn" aria-pressed="false">Mute</button><button class="tgl solo" id="soloBtn" aria-pressed="false">Solo</button><button class="small" id="clearMS" hidden>Unmute all</button></span>
     </div>
-    <div class="params" id="params"></div>
     <div class="smp-row" id="smpRow">
-      <span class="lbl">Sound</span><span class="smp-name" id="smpName">Built-in</span>
+      <span class="lbl" id="smpLbl">Sound</span><span class="smp-name" id="smpName">Built-in</span>
       <span class="smp-btns"><button class="small" id="smpLoad">Load sample</button><button class="small" id="smpClear">Use built-in</button></span>
       <input type="file" id="smpFile" accept="audio/*,.wav,.aif,.aiff,.mp3,.m4a,.caf" hidden>
       <p class="notes" id="smpMsg" aria-live="polite"></p>
@@ -238,11 +234,6 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
     <span class="spacer"></span>
     <button class="small" id="reset">Reset</button>
     <button class="small" id="clear">Clear</button>
-  </section>
-
-  <section class="pads" aria-label="Drum pads">
-    <div class="g-head"><h2>Pads</h2><button class="tgl" id="recBtn" aria-pressed="false" style="margin-right:auto">Rec</button><span class="lbl" id="padInfo">Tap to play · no need to press Start</span></div>
-    <div class="padgrid" id="pads"></div>
   </section>
 
   <section class="groove" aria-label="Swing and groove">
@@ -283,7 +274,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
     <p class="notes" id="bkStatus" aria-live="polite">Saves one file with all four patterns, every setting and any samples you've loaded. Keep it in Files or iCloud Drive.</p>
   </section>
 
-  <p class="notes"><b>On iPhone:</b> tap Start once to wake the audio. If you hear nothing, flip the silent switch off and turn the volume up. Patterns and settings are saved on this phone; use Backup to keep a copy. Works offline once it has loaded. Tap a pad to jam (no need to press Start); press Rec to save your taps into the pattern as it loops. Tap an instrument button to hear it and select it.</p>
+  <p class="notes"><b>On iPhone:</b> tap Start once to wake the audio. If you hear nothing, flip the silent switch off and turn the volume up. Patterns and settings are saved on this phone; use Backup to keep a copy. Works offline once it has loaded. Tap the instrument buttons to jam, no need to press Start; each tap also selects that drum for editing. Press Rec to save your taps into the pattern as it loops.</p>
 </main>
 
 <script>
@@ -302,7 +293,6 @@ const VOICES=[
  {id:'rd',short:'RD',name:'Ride',p:{level:.45,tune:.4,decay:1}},
  {id:'ac',short:'AC',name:'Accent',p:{}}
 ];
-const PNAMES={level:'Level',tune:'Tune',tone:'Tone',attack:'Attack',snappy:'Snappy',decay:'Decay'};
 const P=s=>[...s].map(c=>c==='x');
 const PRESETS=[
  {name:'House',t:{bd:'x...x...x...x...',cp:'....x.......x...',ch:'x...x...x...x...',oh:'..x...x...x...x.',ac:'..x...x...x...x.'}},
@@ -503,7 +493,7 @@ const SYN={
 };
 /* every drum plays the real 909 recordings from the free Aminet TR-909 set (samples/aminet-tr909).
    Knobs pick the nearest recordings and blend between them; the rebuilt sounds stand in until they have loaded */
-const APP_VERSION='v24';
+const APP_VERSION='v25';
 let recDone=false,recLoaded=0;
 const REC={},RK=['0','3','7','a'],R6=['0','2','4','6','8','a'];
 const kickName=(tu,at,d)=>tu==='0'&&at==='0'&&d==='7'?'bt0a0a7':`bt${tu}a${at}d${d}`;   // that one file has a different name in the set
@@ -676,29 +666,27 @@ function renderVoices(){
   VOICES.forEach(v=>{
     const b=document.createElement('button');b.className='voice'+(state.sel===v.id?' sel':'')+(samples[v.id]?' smp':'')+(v.id!=='ac'&&!audible(v.id)?' muted':'')+(state.solo[v.id]?' soloed':'');b.dataset.id=v.id;
     b.innerHTML=`${state.solo[v.id]?'<span class="ms">SOLO</span>':state.mute[v.id]?'<span class="ms">MUTE</span>':''}<b>${v.short}</b><span>${samples[v.id]?'Sample':v.name}</span>`;
-    b.onclick=()=>{state.sel=v.id;if(v.id!=='ac'){ensureAudio();trigger(v.id,ctx.currentTime+.01,.85)}renderVoices();renderEditor();renderMatrix();save()};
     box.appendChild(b);
   });
-  labelPads();
 }
-/* live pads: sound starts on touch-down (not on release, as a click would), several fingers at once */
-const PADS=[['cr'],['rd'],['oh'],['ch'],['lt'],['mt'],['ht'],['cp'],['bd',1],['sd'],['rs']];
-function renderPads(){
-  const box=$('pads');
-  $('recBtn').onclick=()=>{setRec(!rec);if(rec&&!playing)start()};
-  PADS.forEach(([id,wide])=>{const v=VOICES.find(x=>x.id===id),b=document.createElement('button');
-    b.type='button';b.className='pad'+(wide?' wide':'');b.dataset.id=id;b.innerHTML=`<b>${v.short}</b><span></span>`;box.appendChild(b)});
-  const hit=b=>{trigger(b.dataset.id,ctx.currentTime,.85);if(rec&&playing)recHit(b.dataset.id);b.classList.add('down');clearTimeout(b._t);b._t=setTimeout(()=>b.classList.remove('down'),110)};
-  box.addEventListener('pointerdown',e=>{const b=e.target.closest('.pad');if(!b)return;e.preventDefault();
+/* instrument buttons: the sound starts on touch-down (a click waits for the finger to lift), several fingers at once;
+   each tap also selects that drum for editing, without rebuilding the row under the fingers */
+function setupVoices(){
+  const box=$('voices');
+  const hit=b=>{const id=b.dataset.id;
+    if(id!=='ac'){trigger(id,ctx.currentTime,.85);if(rec&&playing)recHit(id)}
+    b.classList.add('down');clearTimeout(b._t);b._t=setTimeout(()=>b.classList.remove('down'),110);
+    if(state.sel!==id){state.sel=id;box.querySelectorAll('.voice').forEach(x=>x.classList.toggle('sel',x===b));renderEditor();renderMatrix();save()}};
+  box.addEventListener('pointerdown',e=>{const b=e.target.closest('.voice');if(!b)return;e.preventDefault();
     ensureAudio();if(ctx.state==='running'){hit(b)}else{b._wait=true}});
   // phones only let the audio start on a finger lift, so the very first tap plays when lifted
-  box.addEventListener('pointerup',e=>{const b=e.target.closest('.pad');if(b&&b._wait){b._wait=false;ensureAudio();hit(b)}});
-  box.addEventListener('click',e=>{const b=e.target.closest('.pad');if(b&&e.detail===0){ensureAudio();hit(b)}});   // keyboard
+  box.addEventListener('pointerup',e=>{const b=e.target.closest('.voice');if(b&&b._wait){b._wait=false;ensureAudio();hit(b)}});
+  box.addEventListener('click',e=>{const b=e.target.closest('.voice');if(b&&e.detail===0){ensureAudio();hit(b)}});   // keyboard
   box.addEventListener('contextmenu',e=>e.preventDefault());
-  labelPads();
+  $('recBtn').onclick=()=>{setRec(!rec);if(rec&&!playing)start()};
 }
 /* Rec: while the beat runs, each pad tap is saved on the nearest step of the current pattern */
-function setRec(on){rec=on;$('recBtn').setAttribute('aria-pressed',on);$('padInfo').textContent=on?'Recording · taps go on the nearest step':'Tap to play · no need to press Start'}
+function setRec(on){rec=on;$('recBtn').setAttribute('aria-pressed',on)}
 function recHit(id){
   const T=ctx.currentTime-(ctx.outputLatency||ctx.baseLatency||0);   // when the player heard the beat they were tapping along to
   let best=null;for(const h of heard)if(!best||Math.abs(h.t-T)<Math.abs(best.t-T))best=h;
@@ -708,21 +696,9 @@ function recHit(id){
   if(state.sel===id&&stepEls[s]){stepEls[s].classList.add('on');stepEls[s].setAttribute('aria-pressed',true)}
   clearReady();renderExport();save();
 }
-function labelPads(){document.querySelectorAll('.pad').forEach(b=>{const v=VOICES.find(x=>x.id===b.dataset.id);b.querySelector('span').textContent=samples[v.id]?'Sample':v.name})}
 function renderEditor(){
   const v=VOICES.find(x=>x.id===state.sel),pat=state.patterns[state.pat][v.id];
   $('edName').innerHTML=`${v.name} <em>· ${'ABCD'[state.pat]}</em>`;
-  const pb=$('params');pb.innerHTML='';
-  Object.keys(v.p).filter(k=>!(samples[v.id]&&(k==='attack'||k==='snappy'||k==='tone'))).forEach(k=>{
-    const val=Math.round(state.params[v.id][k]*100);
-    const l=document.createElement('label');l.className='fader';
-    l.innerHTML=`<span class="row"><span class="lbl">${PNAMES[k]}</span><output>${val}</output></span><input type="range" id="p-${v.id}-${k}" min="0" max="100" value="${val}">`;
-    const inp=l.querySelector('input'),out=l.querySelector('output');
-    inp.oninput=()=>{state.params[v.id][k]=inp.value/100;out.textContent=inp.value;save()};
-    inp.onchange=()=>{ensureAudio();if(!playing)trigger(v.id,ctx.currentTime+.01,.85)};
-    pb.appendChild(l);
-  });
-  if(v.id==='ac'){pb.innerHTML='<p class="notes" style="grid-column:1/-1">Accented steps hit every instrument on that step harder. Set how much with the Accent fader above.</p>'}
   renderSampleRow(v);renderMS(v);
   const sb=$('steps');sb.innerHTML='';stepEls=[];
   for(let i=0;i<16;i++){
@@ -862,10 +838,10 @@ $('exWav').onclick=async()=>{
 document.addEventListener('click',e=>{if(e.target.closest('.pat,.step,.cell,#tDown,#tUp,#reset,#clear,.tpl,#res button'))setTimeout(()=>{clearReady();renderExport()},0)});
 
 function renderSampleRow(v){
-  $('smpRow').hidden=v.id==='ac';
-  const u=samples[v.id];
-  $('smpName').textContent=u?u.name:'Built-in · real 909 recording';
-  $('smpName').classList.toggle('on',!!u);$('smpClear').hidden=!u;
+  const ac=v.id==='ac',u=samples[v.id];
+  $('smpLbl').textContent=ac?'Accent':'Sound';$('smpLoad').style.visibility=ac?'hidden':'';   // keep its space so the buttons below don't move
+  $('smpName').textContent=ac?'Accented steps hit every drum harder':u?u.name:'Built-in · real 909 recording';
+  $('smpName').classList.toggle('on',!!u&&!ac);$('smpClear').hidden=ac||!u;
 }
 $('smpLoad').onclick=()=>{$('smpMsg').textContent='';$('smpFile').value='';$('smpFile').click()};
 $('smpFile').onchange=async()=>{
@@ -877,7 +853,7 @@ $('smpFile').onchange=async()=>{
     samples[id]={name:f.name,buf};
     const p=state.params[id];if('tune' in p)p.tune=.5;if('decay' in p)p.decay=1;save();
     try{await SDB.run('readwrite',st=>st.put({name:f.name,data},id))}catch(e){$('smpMsg').textContent='Loaded, but this browser could not save it for next time.'}
-    if($('smpMsg').textContent==='Loading…')$('smpMsg').textContent=`${v.name} now plays ${f.name}. Tune and Decay work on it too.`;
+    if($('smpMsg').textContent==='Loading…')$('smpMsg').textContent=`${v.name} now plays ${f.name}.`;
     renderVoices();renderEditor();ensureAudio();if(!playing)trigger(id,ctx.currentTime+.01,.85);
   }catch(e){$('smpMsg').textContent="That file couldn't be read. Try a WAV, AIFF, MP3 or M4A file."}
 };
@@ -889,7 +865,7 @@ $('smpClear').onclick=async()=>{
   renderVoices();renderEditor();ensureAudio();if(!playing)trigger(id,ctx.currentTime+.01,.85);
 };
 function renderMS(v){
-  const show=v.id!=='ac';$('muteBtn').hidden=!show;$('soloBtn').hidden=!show;
+  const show=v.id!=='ac';$('muteBtn').style.visibility=$('soloBtn').style.visibility=show?'':'hidden';
   $('muteBtn').setAttribute('aria-pressed',!!state.mute[v.id]);$('soloBtn').setAttribute('aria-pressed',!!state.solo[v.id]);
   $('clearMS').hidden=!VOICES.some(x=>state.mute[x.id]||state.solo[x.id]);
 }
@@ -925,7 +901,7 @@ $('bkYes').onclick=async()=>{
     clearTimeout(saveT);localStorage.setItem('rb16',JSON.stringify(j.state));location.reload();
   }catch(e){$('bkStatus').textContent='The restore failed, so nothing was changed. Try again.'}
 };
-setBpm(state.bpm);renderGroove();renderPats();renderPads();renderVoices();renderEditor();renderMatrix();renderExport();requestAnimationFrame(draw);loadSavedSamples();startSounds();loadRecordings();
+setBpm(state.bpm);renderGroove();renderPats();setupVoices();renderVoices();renderEditor();renderMatrix();renderExport();requestAnimationFrame(draw);loadSavedSamples();startSounds();loadRecordings();
 if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){
   const had=!!navigator.serviceWorker.controller;let reloaded=false;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had&&!reloaded&&!playing){reloaded=true;location.reload()}});   // a new version arrived: show it now
