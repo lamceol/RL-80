@@ -605,7 +605,7 @@ const SYN={
 };
 /* every drum plays the real 909 recordings from the free Aminet TR-909 set (samples/aminet-tr909).
    Knobs pick the nearest recordings and blend between them; the rebuilt sounds stand in until they have loaded */
-const APP_VERSION='v35';
+const APP_VERSION='v36';
 let recDone=false,recLoaded=0;
 const REC={},RK=['0','3','7','a'],R6=['0','2','4','6','8','a'];
 const kickName=(tu,at,d)=>tu==='0'&&at==='0'&&d==='7'?'bt0a0a7':`bt${tu}a${at}d${d}`;   // that one file has a different name in the set
@@ -1075,6 +1075,15 @@ if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostnam
   navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had&&!reloaded&&!playing){reloaded=true;location.reload()}});   // a new version arrived: show it now
   navigator.serviceWorker.register('sw.js').then(r=>r.update()).catch(()=>{});
 }
+// when the app comes back to the front (a Home Screen app doesn't reload by itself), check for a newer version
+let lastCheck=0;
+async function checkUpdate(){
+  if(playing||Date.now()-lastCheck<30000)return;lastCheck=Date.now();
+  try{const t=await(await fetch('index.html?_='+Date.now(),{cache:'no-store'})).text(),m=t.match(/APP_VERSION='(v\d+)'/);
+    if(m&&m[1]!==APP_VERSION&&!playing){saveNow();location.reload()}}catch(e){}
+}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkUpdate()});
+addEventListener('pageshow',e=>{if(e.persisted)checkUpdate()});
 })();
 </script>
 </body>

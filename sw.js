@@ -1,6 +1,8 @@
 /* RL-80 offline support: keeps a copy of the app on the phone.
    Online it always fetches the latest version first (and refreshes the copy); offline it uses the copy. */
-const CACHE='rl80-v11';
+const CACHE='rl80-v12';
+// ask for a fresh copy with a one-off address, so neither the phone nor GitHub's servers can hand back an old one
+const bust=u=>{const x=new URL(u);x.searchParams.set('_',Date.now());return x.href};
 const CORE=['./','index.html','sounds.js','manifest.webmanifest','fonts/fonts.css',
   'fonts/BarlowCondensed-500.woff2','fonts/BarlowCondensed-600.woff2','fonts/BarlowCondensed-700.woff2',
   'fonts/Michroma-400.woff2','fonts/ShareTechMono-400.woff2',
@@ -12,7 +14,7 @@ self.addEventListener('fetch',e=>{
   const fromCache=()=>caches.match(r,{ignoreSearch:true}).then(m=>m||(r.mode==='navigate'?caches.match('index.html'):undefined));
   const fresh=r.mode==='navigate'||/\.(html|js|css|webmanifest)$/.test(new URL(r.url).pathname)||new URL(r.url).pathname.endsWith('/');
   // always check for the newest app files (not the browser's saved copy)
-  const net=(fresh?fetch(r.mode==='navigate'?r.url:r,{cache:'no-cache'}):fetch(r)).then(res=>{if(res.ok){const cp=res.clone();caches.open(CACHE).then(c=>c.put(r,cp))}return res});
+  const net=(fresh?fetch(bust(r.url),{cache:'no-store'}):fetch(r)).then(res=>{if(res.ok){const cp=res.clone();caches.open(CACHE).then(c=>c.put(r,cp))}return res});
   // wait up to 4 s for the network, then fall back to the saved copy
   e.respondWith(Promise.race([net,new Promise(res=>setTimeout(()=>fromCache().then(m=>m&&res(m)),4000))]).catch(()=>fromCache()));
 });
