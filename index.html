@@ -46,8 +46,10 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--lit);outline-of
 /* transport */
 .transport{display:grid;grid-template-columns:auto 1fr;gap:14px 18px;align-items:center}
 .play{min-width:110px;height:56px;border-radius:8px;border:1px solid #000;background:var(--key);color:var(--key-ink);font-weight:700;font-size:18px;letter-spacing:.14em;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 3px 0 #0007}
-.tbtns{display:flex;gap:8px}
-.play.rec{min-width:76px}
+.tbtns{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:8px}
+.tbtns .play{min-width:0;padding:0 4px;letter-spacing:.08em}
+.play:disabled{opacity:.35;box-shadow:none}
+.play.rec{font-size:16px}
 .play.rec.clk[aria-pressed="true"]{background:var(--lit);color:#2a1606;box-shadow:0 0 14px var(--lit-glow)}
 .play.rec.counting{animation:blink .5s steps(2) infinite}
 .rec-ask{grid-column:1/-1}
@@ -211,8 +213,15 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
     <p id="kitStatus">Rhythm Box · building sounds…</p>
   </header>
 
+  <section class="tip" id="shareIn" aria-label="Shared beat" hidden>
+    <h2>A beat for you</h2>
+    <p id="shareInfo"></p>
+    <div class="confirm"><button class="ex-btn ready" id="shareLoad">Load and play</button><button class="small" id="shareNo">No thanks</button></div>
+    <p class="notes" id="shareNote"></p>
+  </section>
+
   <section class="transport" aria-label="Transport">
-    <div class="tbtns"><button class="play" id="play" aria-pressed="false"><span class="dot"></span><span id="playTxt">Start</span></button><button class="play rec" id="recBtn" aria-pressed="false" aria-label="Record taps into the pattern">Rec</button><button class="play rec clk" id="clickBtn" aria-pressed="false" aria-label="Metronome">Click</button></div>
+    <div class="tbtns"><button class="play" id="play" aria-pressed="false"><span class="dot"></span><span id="playTxt">Start</span></button><button class="play rec" id="recBtn" aria-pressed="false" aria-label="Record taps into the pattern">Rec</button><button class="play rec clk" id="clickBtn" aria-pressed="false" aria-label="Metronome">Click</button><button class="play rec" id="undoBtn" disabled aria-label="Undo the last change to the pattern">Undo</button></div>
     <div class="confirm rec-ask" id="recAsk" hidden><span>Record over this beat, or start from a blank pattern?</span><button class="ex-btn ready" id="recBlank">Start blank</button><button class="small" id="recKeep">Keep beat</button><button class="small" id="recNo">Cancel</button></div>
     <div class="tempo">
       <button class="nudge" id="tDown" aria-label="Tempo down">−</button>
@@ -233,7 +242,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
     <ol>
       <li><b>Tap the drum buttons above</b> to play. No need to press Start.</li>
       <li><b>Press Rec</b> and choose Start blank, then tap along. Turn on <b>Click</b> for a metronome and a count-in.</li>
-      <li><b>Tap the numbered steps</b> to add or remove hits, then press <b>Start</b> to hear your beat.</li>
+      <li><b>Tap the numbered steps</b> to add or remove hits, then press <b>Start</b> to hear your beat. <b>Undo</b> takes back a mistake, and <b>Share</b> sends your beat as a link.</li>
     </ol>
     <p class="notes">No sound on iPhone? Flip the silent switch off and turn the volume up.</p>
     <button class="ex-btn" id="tipOk">Got it</button>
@@ -242,7 +251,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
   <section class="editor" aria-label="Step editor">
     <div class="ed-head">
       <h2 id="edName">Bass Drum</h2>
-      <span class="ed-tools"><button class="tgl" id="muteBtn" aria-pressed="false">Mute</button><button class="tgl solo" id="soloBtn" aria-pressed="false">Solo</button><button class="small" id="clearMS" hidden>Unmute all</button></span>
+      <span class="ed-tools"><button class="tgl" id="muteBtn" aria-pressed="false">Mute</button><button class="tgl solo" id="soloBtn" aria-pressed="false">Solo</button><button class="tgl" id="rowClear">Clear</button><button class="small" id="clearMS" hidden>Unmute all</button></span>
     </div>
     <div class="smp-row" id="smpRow">
       <span class="lbl" id="smpLbl">Sound</span><span class="smp-name" id="smpName">Built-in</span>
@@ -260,6 +269,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
     <span class="spacer"></span>
     <button class="small" id="reset">Reset</button>
     <button class="small" id="clear">Clear</button>
+    <button class="small" id="share">Share</button>
   </section>
 
   <section class="groove" aria-label="Swing and groove">
@@ -522,7 +532,7 @@ const SYN={
 };
 /* every drum plays the real 909 recordings from the free Aminet TR-909 set (samples/aminet-tr909).
    Knobs pick the nearest recordings and blend between them; the rebuilt sounds stand in until they have loaded */
-const APP_VERSION='v27';
+const APP_VERSION='v28';
 let recDone=false,recLoaded=0;
 const REC={},RK=['0','3','7','a'],R6=['0','2','4','6','8','a'];
 const kickName=(tu,at,d)=>tu==='0'&&at==='0'&&d==='7'?'bt0a0a7':`bt${tu}a${at}d${d}`;   // that one file has a different name in the set
@@ -610,6 +620,11 @@ let CH=null;
 function trigger(id,t,v){const keep=master;if(CH&&CH.pan[id])master=CH.pan[id];try{const u=samples[id];if(u){playUser(id,u.buf,t,v,state.params[id]);return}if(REC[id]&&RECPLAY[id])return RECPLAY[id](t,v,state.params[id]);if(SYN[id])SYN[id](t,v,state.params[id])}finally{master=keep}}
 
 /* ---------- sequencer ---------- */
+let undoStack=[],recSnapped=false;
+// undo: keep a copy of a pattern before each change (a recording pass counts as one change)
+function snap(){undoStack.push({pat:state.pat,data:JSON.stringify(state.patterns[state.pat])});if(undoStack.length>50)undoStack.shift();$('undoBtn').disabled=false}
+function undo(){const u=undoStack.pop();if(u){state.patterns[u.pat]=JSON.parse(u.data);if(u.pat!==state.pat&&!playing){state.pat=u.pat;renderPats()}patChanged()}$('undoBtn').disabled=!undoStack.length}
+function patChanged(){renderEditor();renderMatrix();clearReady();renderExport();save()}
 let playing=false,timer,step=0,nextTime=0,queue=[],heard=[],rec=false,countLeft=0,recFrom=0,nowStep=-1,pending=null,wake=null;
 const stepDur=()=>60/state.bpm/4;
 function audible(id){const anySolo=VOICES.some(v=>state.solo[v.id]);return anySolo?!!state.solo[id]:!state.mute[id]}
@@ -631,7 +646,7 @@ function scheduler(){
   while(nextTime<ctx.currentTime+.12){
     if(countLeft>0){if(countLeft%4===0)click(nextTime,countLeft===16);nextTime+=stepDur();countLeft--;continue}   // one-bar count-in
     scheduleStep(step,nextTime);
-    nextTime+=stepDur();step=(step+1)%16;
+    nextTime+=stepDur();step=(step+1)%16;if(step===0)recSnapped=false;
     if(step===0&&pending!==null){state.pat=pending;pending=null;save();renderPats();renderEditor();renderMatrix()}
   }
 }
@@ -726,11 +741,11 @@ function setupVoices(){
   $('clickBtn').onclick=()=>{state.click=!state.click;$('clickBtn').setAttribute('aria-pressed',state.click);save()};
 }
 /* Rec: while the beat runs, each pad tap is saved on the nearest step of the current pattern */
-function setRec(on){rec=on;$('recBtn').setAttribute('aria-pressed',on);if(!on)$('recBtn').classList.remove('counting')}
+function setRec(on){rec=on;recSnapped=false;$('recBtn').setAttribute('aria-pressed',on);if(!on)$('recBtn').classList.remove('counting')}
 // from stopped: optionally clear the pattern, then start (with a one-bar count-in when the click is on)
 function beginRec(blank){
   $('recAsk').hidden=true;
-  if(blank){const p=state.patterns[state.pat];VOICES.forEach(v=>p[v.id]=P('................'));renderEditor();renderMatrix();clearReady();renderExport();save()}
+  if(blank){snap();const p=state.patterns[state.pat];VOICES.forEach(v=>p[v.id]=P('................'));patChanged()}
   setRec(true);start(!!state.click);if(countLeft)$('recBtn').classList.add('counting');
 }
 function click(t,strong){   // metronome: a short beep, higher on beat 1; never recorded or exported
@@ -743,7 +758,7 @@ function recHit(id){
   if(T<recFrom-stepDur()/2)return;   // still in the count-in
   let best=null;for(const h of heard)if(!best||Math.abs(h.t-T)<Math.abs(best.t-T))best=h;
   if(!best)return;const s=best.s,vi=VOICES.findIndex(v=>v.id===id),pat=state.patterns[state.pat][id];
-  if(pat[s])return;pat[s]=true;
+  if(pat[s])return;if(!recSnapped){snap();recSnapped=true}pat[s]=true;
   cellEls[vi][s].classList.add('on');
   if(state.sel===id&&stepEls[s]){stepEls[s].classList.add('on');stepEls[s].setAttribute('aria-pressed',true)}
   clearReady();renderExport();save();
@@ -758,7 +773,7 @@ function renderEditor(){
     b.className='step'+((i>>2)%2?' alt':'')+(pat[i]?' on':'')+(i===nowStep?' now':'');
     b.setAttribute('aria-label',`Step ${i+1}`);b.setAttribute('aria-pressed',pat[i]);
     b.innerHTML=`<span class="led"></span><span>${i+1}</span>`;
-    b.onclick=()=>{pat[i]=!pat[i];b.classList.toggle('on',pat[i]);b.setAttribute('aria-pressed',pat[i]);cellEls[VOICES.indexOf(v)][i].classList.toggle('on',pat[i]);
+    b.onclick=()=>{snap();pat[i]=!pat[i];b.classList.toggle('on',pat[i]);b.setAttribute('aria-pressed',pat[i]);cellEls[VOICES.indexOf(v)][i].classList.toggle('on',pat[i]);
       if(pat[i]&&!playing&&v.id!=='ac'){ensureAudio();trigger(v.id,ctx.currentTime+.01,.85)}save()};
     sb.appendChild(b);stepEls.push(b);
   }
@@ -773,7 +788,7 @@ function renderMatrix(){
       const c=document.createElement('button');
       c.className='cell'+((i>>2)%2?' q':'')+(pat[v.id][i]?' on':'')+(v.id==='ac'?' ac':'')+(i===nowStep?' now':'');
       c.setAttribute('aria-label',`${v.name} step ${i+1}`);
-      c.onclick=()=>{pat[v.id][i]=!pat[v.id][i];c.classList.toggle('on',pat[v.id][i]);if(state.sel===v.id){stepEls[i].classList.toggle('on',pat[v.id][i])}save()};
+      c.onclick=()=>{snap();pat[v.id][i]=!pat[v.id][i];c.classList.toggle('on',pat[v.id][i]);if(state.sel===v.id){stepEls[i].classList.toggle('on',pat[v.id][i])}save()};
       m.appendChild(c);row.push(c);
     }
     cellEls.push(row);
@@ -797,8 +812,34 @@ let clearArm=null;
 $('clear').onclick=e=>{const b=e.currentTarget;
   if(!clearArm){b.textContent='Tap to confirm';b.classList.add('warn');clearArm=setTimeout(()=>{clearArm=null;b.textContent='Clear';b.classList.remove('warn')},3000);return}
   clearTimeout(clearArm);clearArm=null;b.textContent='Clear';b.classList.remove('warn');
-  const p=state.patterns[state.pat];VOICES.forEach(v=>p[v.id]=P('................'));renderEditor();renderMatrix();save()};
-$('reset').onclick=()=>{state.patterns[state.pat]=presetPattern(state.pat);renderEditor();renderMatrix();save()};
+  snap();const p=state.patterns[state.pat];VOICES.forEach(v=>p[v.id]=P('................'));patChanged()};
+$('reset').onclick=()=>{snap();state.patterns[state.pat]=presetPattern(state.pat);patChanged()};
+$('undoBtn').onclick=undo;
+$('rowClear').onclick=()=>{const r=state.patterns[state.pat][state.sel];if(!r.some(Boolean))return;snap();state.patterns[state.pat][state.sel]=P('................');patChanged()};
+/* share a beat as a link: tempo, groove and the current pattern, packed into the part after # */
+function beatCode(){const g=state.groove,p=state.patterns[state.pat];
+  const bits=VOICES.map(v=>p[v.id].reduce((n,on,i)=>n|(on?1<<i:0),0).toString(16).padStart(4,'0')).join('');
+  return ['1',state.bpm,g.swing,g.res,g.tpl,Math.round(g.amount*100),g.hTime,g.hVel,g.lockKick?1:0,bits].join('.')}
+function readBeat(code){const a=String(code).split('.');if(a.length!==10||a[0]!=='1'||!/^[0-9a-f]{48}$/.test(a[9]))return null;
+  const n=i=>Number(a[i]),pat={};VOICES.forEach((v,k)=>{const x=parseInt(a[9].substr(k*4,4),16);pat[v.id]=[...Array(16)].map((_,i)=>!!(x>>i&1))});
+  const g={swing:n(2),res:n(3)===8?8:16,tpl:GROOVES.some(t=>t.id===a[4])?a[4]:'straight',amount:n(5)/100,hTime:n(6),hVel:n(7),lockKick:a[8]==='1'};
+  if(![1,2,5,6,7].every(i=>Number.isFinite(n(i))))return null;
+  return{bpm:Math.max(60,Math.min(200,n(1))),groove:{...GDEF,...g,swing:Math.max(50,Math.min(75,g.swing)),amount:Math.max(0,Math.min(1.5,g.amount)),hTime:Math.max(0,Math.min(20,g.hTime)),hVel:Math.max(0,Math.min(30,g.hVel))},pat}}
+$('share').onclick=async()=>{const b=$('share'),url=location.origin+location.pathname+'#b='+beatCode();
+  const done=t=>{b.textContent=t;setTimeout(()=>b.textContent='Share',2500)};
+  if(navigator.share){try{await navigator.share({title:'RL-80 beat',text:'Have a listen to my beat on RL-80',url});return}catch(e){if(e&&e.name==='AbortError')return}}
+  try{await navigator.clipboard.writeText(url);done('Link copied')}catch(e){prompt('Copy this link:',url)}};
+let incoming=null;
+function checkShared(){const m=location.hash.match(/^#b=([0-9a-z.]+)$/i);if(!m)return;incoming=readBeat(m[1].toLowerCase());
+  history.replaceState(null,'',location.pathname+location.search);if(!incoming)return;
+  const hits=Object.values(incoming.pat).flat().filter(Boolean).length;
+  $('shareInfo').textContent=`${incoming.bpm} BPM · ${hits} hits`+(incoming.groove.swing>50?` · swing ${incoming.groove.swing}%`:'');
+  $('shareNote').textContent=`It goes into pattern ${'ABCD'[state.pat]}, replacing what's there. Undo brings yours back.`;
+  $('shareIn').hidden=false;scrollTo(0,0)}
+$('shareLoad').onclick=()=>{if(!incoming)return;snap();state.patterns[state.pat]=incoming.pat;state.groove=incoming.groove;setBpm(incoming.bpm);renderGroove();patChanged();
+  incoming=null;$('shareIn').hidden=true;if(!playing)start()};
+$('shareNo').onclick=()=>{incoming=null;$('shareIn').hidden=true};
+addEventListener('hashchange',checkShared);
 
 /* ---------- export: MIDI + WAV ---------- */
 const NOTE={bd:36,rs:37,sd:38,cp:39,ch:42,lt:45,oh:46,mt:47,cr:49,ht:50,rd:51};
@@ -956,7 +997,7 @@ $('bkYes').onclick=async()=>{
 $('tip').hidden=!!state.tipSeen;$('tipShow').onclick=()=>{$('tip').hidden=false;$('tip').scrollIntoView({behavior:'smooth'})};$('tipOk').onclick=()=>{state.tipSeen=1;$('tip').hidden=true;save()};
 const gOpen=o=>{$('grooveTgl').setAttribute('aria-expanded',o);$('grooveBody').hidden=!o};gOpen(!!state.grooveOpen);
 $('grooveTgl').onclick=()=>{state.grooveOpen=!state.grooveOpen;gOpen(state.grooveOpen);save()};
-setBpm(state.bpm);renderGroove();renderPats();setupVoices();renderVoices();renderEditor();renderMatrix();renderExport();requestAnimationFrame(draw);loadSavedSamples();startSounds();loadRecordings();
+setBpm(state.bpm);renderGroove();renderPats();checkShared();setupVoices();renderVoices();renderEditor();renderMatrix();renderExport();requestAnimationFrame(draw);loadSavedSamples();startSounds();loadRecordings();
 if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){
   const had=!!navigator.serviceWorker.controller;let reloaded=false;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had&&!reloaded&&!playing){reloaded=true;location.reload()}});   // a new version arrived: show it now
