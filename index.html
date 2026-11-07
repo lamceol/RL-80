@@ -158,7 +158,6 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
 .tgl[aria-pressed="true"]{background:var(--led);border-color:var(--led);color:#1a0806}
 .tgl.solo[aria-pressed="true"]{background:var(--lit);border-color:var(--lit);color:#2a1606}
 .matrix .rl.muted{opacity:.35;text-decoration:line-through}
-.backup{display:grid;gap:12px;background:var(--groove);border-radius:8px;padding:14px;border:1px solid #000}
 .confirm{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 
 .steps{display:grid;grid-template-columns:repeat(16,minmax(0,1fr));gap:6px}
@@ -194,7 +193,13 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
 .notes{font-size:14px;line-height:1.5;color:var(--muted);max-width:65ch;margin:0}
 .notes b{color:var(--label);font-weight:600}
 /* export */
-.export{display:grid;gap:12px;background:var(--groove);border-radius:8px;padding:14px;border:1px solid #000}
+.save{display:grid;gap:10px;background:var(--groove);border-radius:8px;padding:12px 14px;border:1px solid #000}
+.sv-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
+.sv-row .lbl{min-width:120px}
+.sv-ctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.save .seg button{padding:0 11px}
+.save .notes:empty{display:none}
+.ex-btn.sm{height:36px;min-width:0;padding:0 14px;font-size:14px;border-radius:6px;box-shadow:0 2px 0 #0007}
 .ex-row{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:end}
 .ex-col{display:grid;gap:6px}
 .ex-btns{display:flex;gap:10px;flex-wrap:wrap}
@@ -202,7 +207,6 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
 .ex-btn:active{transform:translateY(2px);box-shadow:0 1px 0 #0007}
 .ex-btn.ready{background:var(--lit);color:#2a1606;box-shadow:0 3px 0 #0007,0 0 14px var(--lit-glow)}
 .ex-btn:disabled{opacity:.6;cursor:progress}
-#exStatus{min-height:1.5em}
 @media (prefers-reduced-motion:reduce){.pat.queued{animation:none;outline:2px dashed var(--lit)}}
 </style>
 </head>
@@ -297,20 +301,14 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
     <div class="matrix" id="matrix"></div>
   </section>
 
-  <section class="export" aria-label="Download loop">
-    <div class="g-head"><h2>Download loop</h2><span class="lbl" id="exInfo">Pattern A</span></div>
-    <div class="ex-row">
-      <div class="ex-col"><span class="lbl">Length</span><div class="seg" id="exBars"><button data-b="1">1 bar</button><button data-b="2">2</button><button data-b="4">4</button><button data-b="8">8</button></div></div>
-      <div class="ex-btns"><button class="ex-btn" id="exMidi">MIDI file</button><button class="ex-btn" id="exWav">WAV audio</button></div>
-    </div>
-    <p class="notes" id="exStatus" aria-live="polite">Exports the pattern you're on. Swing, groove, humanise and mutes are included; the WAV is stereo. The WAV loops seamlessly: cymbal tails wrap round to the start.</p>
-  </section>
-
-  <section class="backup" aria-label="Backup">
-    <div class="g-head"><h2>Backup</h2><span class="lbl">Patterns, settings and your samples</span></div>
-    <div class="ex-btns"><button class="ex-btn" id="bkSave">Back up</button><button class="ex-btn" id="bkLoad">Restore</button><input type="file" id="bkFile" accept=".json,application/json" hidden></div>
-    <div class="confirm" id="bkConfirm" hidden><span>Replace everything on this phone with this backup?</span><button class="ex-btn ready" id="bkYes">Replace</button><button class="small" id="bkNo">Cancel</button></div>
-    <p class="notes" id="bkStatus" aria-live="polite">Saves one file with all four patterns, every setting and any samples you've loaded. Keep it in Files or iCloud Drive.</p>
+  <section class="save" aria-label="Download and backup">
+    <div class="sv-row"><span class="lbl">Download loop</span>
+      <div class="sv-ctl"><div class="seg" id="exBars"><button data-b="1">1 bar</button><button data-b="2">2</button><button data-b="4">4</button><button data-b="8">8</button></div><button class="ex-btn sm" id="exMidi">MIDI</button><button class="ex-btn sm" id="exWav">WAV</button></div></div>
+    <p class="notes" id="exStatus" aria-live="polite"></p>
+    <div class="sv-row"><span class="lbl">Backup</span>
+      <div class="sv-ctl"><button class="ex-btn sm" id="bkSave">Back up</button><button class="ex-btn sm" id="bkLoad">Restore</button><input type="file" id="bkFile" accept=".json,application/json" hidden></div></div>
+    <div class="confirm" id="bkConfirm" hidden><span>Replace everything on this phone with this backup?</span><button class="ex-btn sm ready" id="bkYes">Replace</button><button class="small" id="bkNo">Cancel</button></div>
+    <p class="notes" id="bkStatus" aria-live="polite"></p>
   </section>
 
   <p class="notes"><b>On iPhone:</b> if you hear nothing, flip the silent switch off and turn the volume up. Patterns and settings are saved on this phone; use Backup to keep a copy. Works offline once it has loaded. <button class="small" id="tipShow">Show quick start</button></p>
@@ -533,7 +531,7 @@ const SYN={
 };
 /* every drum plays the real 909 recordings from the free Aminet TR-909 set (samples/aminet-tr909).
    Knobs pick the nearest recordings and blend between them; the rebuilt sounds stand in until they have loaded */
-const APP_VERSION='v29';
+const APP_VERSION='v30';
 let recDone=false,recLoaded=0;
 const REC={},RK=['0','3','7','a'],R6=['0','2','4','6','8','a'];
 const kickName=(tu,at,d)=>tu==='0'&&at==='0'&&d==='7'?'bt0a0a7':`bt${tu}a${at}d${d}`;   // that one file has a different name in the set
@@ -907,10 +905,9 @@ function exReport(r,name){exStatus(r==='shared'?`Sent ${name}.`:r==='cancelled'?
 function renderExport(){
   const b=state.exportBars||2;
   document.querySelectorAll('#exBars button').forEach(x=>x.classList.toggle('on',+x.dataset.b===b));
-  $('exInfo').textContent=`Pattern ${'ABCD'[state.pat]} · ${state.bpm} BPM · ${b} bar${b>1?'s':''}`;
 }
 document.querySelectorAll('#exBars button').forEach(x=>x.onclick=()=>{state.exportBars=+x.dataset.b;clearReady();renderExport();save()});
-function clearReady(){exReady=null;const w=$('exWav');w.classList.remove('ready');w.textContent='WAV audio'}
+function clearReady(){exReady=null;const w=$('exWav');w.classList.remove('ready');w.textContent='WAV'}
 $('exMidi').onclick=async()=>{
   const b=state.exportBars||2,name=fileBase(b)+'.mid';
   const r=await deliver(buildMidi(b),name);exReport(r,name);
@@ -924,8 +921,8 @@ $('exWav').onclick=async()=>{
     const blob=await renderWav(b);
     const r=await deliver(blob,name);
     if(r==='needtap'){exReady={blob,name};w.classList.add('ready');w.textContent='Save WAV';exStatus('Your WAV is ready. Tap Save WAV.')}
-    else{w.textContent='WAV audio';exReport(r,name)}
-  }catch(e){w.textContent='WAV audio';exStatus('The recording failed. Try again, or pick a shorter length.')}
+    else{w.textContent='WAV';exReport(r,name)}
+  }catch(e){w.textContent='WAV';exStatus('The recording failed. Try again, or pick a shorter length.')}
   finally{w.disabled=false}
 };
 ['bpm','swing','gAmt','hTime','hVel','accent','volume'].forEach(id=>$(id).addEventListener('input',()=>{clearReady();renderExport()}));
