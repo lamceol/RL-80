@@ -48,6 +48,9 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--lit);outline-of
 .play{min-width:110px;height:56px;border-radius:8px;border:1px solid #000;background:var(--key);color:var(--key-ink);font-weight:700;font-size:18px;letter-spacing:.14em;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 3px 0 #0007}
 .tbtns{display:flex;gap:8px}
 .play.rec{min-width:76px}
+.play.rec.clk[aria-pressed="true"]{background:var(--lit);color:#2a1606;box-shadow:0 0 14px var(--lit-glow)}
+.play.rec.counting{animation:blink .5s steps(2) infinite}
+.rec-ask{grid-column:1/-1}
 .play.rec[aria-pressed="true"]{background:var(--led);color:#1a0806;box-shadow:0 0 14px rgba(255,61,46,.5)}
 .play .dot{width:10px;height:10px;border-radius:50%;background:#5a2a24}
 .play[aria-pressed="true"] .dot{background:var(--led);box-shadow:0 0 10px var(--led)}
@@ -198,7 +201,8 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
   </header>
 
   <section class="transport" aria-label="Transport">
-    <div class="tbtns"><button class="play" id="play" aria-pressed="false"><span class="dot"></span><span id="playTxt">Start</span></button><button class="play rec" id="recBtn" aria-pressed="false" aria-label="Record taps into the pattern">Rec</button></div>
+    <div class="tbtns"><button class="play" id="play" aria-pressed="false"><span class="dot"></span><span id="playTxt">Start</span></button><button class="play rec" id="recBtn" aria-pressed="false" aria-label="Record taps into the pattern">Rec</button><button class="play rec clk" id="clickBtn" aria-pressed="false" aria-label="Metronome">Click</button></div>
+    <div class="confirm rec-ask" id="recAsk" hidden><span>Record over this beat, or start from a blank pattern?</span><button class="ex-btn ready" id="recBlank">Start blank</button><button class="small" id="recKeep">Keep beat</button><button class="small" id="recNo">Cancel</button></div>
     <div class="tempo">
       <button class="nudge" id="tDown" aria-label="Tempo down">−</button>
       <div class="lcd" id="bpmLcd" aria-live="polite">125.0<small>BPM</small></div>
@@ -274,7 +278,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
     <p class="notes" id="bkStatus" aria-live="polite">Saves one file with all four patterns, every setting and any samples you've loaded. Keep it in Files or iCloud Drive.</p>
   </section>
 
-  <p class="notes"><b>On iPhone:</b> tap Start once to wake the audio. If you hear nothing, flip the silent switch off and turn the volume up. Patterns and settings are saved on this phone; use Backup to keep a copy. Works offline once it has loaded. Tap the instrument buttons to jam, no need to press Start; each tap also selects that drum for editing. Press Rec to save your taps into the pattern as it loops.</p>
+  <p class="notes"><b>On iPhone:</b> tap Start once to wake the audio. If you hear nothing, flip the silent switch off and turn the volume up. Patterns and settings are saved on this phone; use Backup to keep a copy. Works offline once it has loaded. Tap the instrument buttons to jam, no need to press Start; each tap also selects that drum for editing. Press Rec to save your taps into the pattern as it loops (you can start from a blank pattern); turn on Click for a metronome and a one-bar count-in.</p>
 </main>
 
 <script>
@@ -493,7 +497,7 @@ const SYN={
 };
 /* every drum plays the real 909 recordings from the free Aminet TR-909 set (samples/aminet-tr909).
    Knobs pick the nearest recordings and blend between them; the rebuilt sounds stand in until they have loaded */
-const APP_VERSION='v25';
+const APP_VERSION='v26';
 let recDone=false,recLoaded=0;
 const REC={},RK=['0','3','7','a'],R6=['0','2','4','6','8','a'];
 const kickName=(tu,at,d)=>tu==='0'&&at==='0'&&d==='7'?'bt0a0a7':`bt${tu}a${at}d${d}`;   // that one file has a different name in the set
@@ -581,7 +585,7 @@ let CH=null;
 function trigger(id,t,v){const keep=master;if(CH&&CH.pan[id])master=CH.pan[id];try{const u=samples[id];if(u){playUser(id,u.buf,t,v,state.params[id]);return}if(REC[id]&&RECPLAY[id])return RECPLAY[id](t,v,state.params[id]);if(SYN[id])SYN[id](t,v,state.params[id])}finally{master=keep}}
 
 /* ---------- sequencer ---------- */
-let playing=false,timer,step=0,nextTime=0,queue=[],heard=[],rec=false,nowStep=-1,pending=null,wake=null;
+let playing=false,timer,step=0,nextTime=0,queue=[],heard=[],rec=false,countLeft=0,recFrom=0,nowStep=-1,pending=null,wake=null;
 const stepDur=()=>60/state.bpm/4;
 function audible(id){const anySolo=VOICES.some(v=>state.solo[v.id]);return anySolo?!!state.solo[id]:!state.mute[id]}
 function scheduleStep(s,t0){
@@ -594,18 +598,21 @@ function scheduleStep(s,t0){
     if(!(g.lockKick&&vc.id==='bd')){t+=f.off*sd+r()*g.hTime/1000;v*=f.vel*(1+r()*g.hVel/100)}
     trigger(vc.id,Math.max(t,ctx.currentTime+.003),Math.max(.05,v));
   });
+  if(state.click&&s%4===0)click(t0,s===0);
   queue.push({s,t:t0+f.off*sd});heard.push({s,t:t0+f.off*sd});if(heard.length>32)heard.shift();
 }
 function scheduler(){
   if(nextTime<ctx.currentTime-.05){nextTime=ctx.currentTime+.05}
   while(nextTime<ctx.currentTime+.12){
+    if(countLeft>0){if(countLeft%4===0)click(nextTime,countLeft===16);nextTime+=stepDur();countLeft--;continue}   // one-bar count-in
     scheduleStep(step,nextTime);
     nextTime+=stepDur();step=(step+1)%16;
     if(step===0&&pending!==null){state.pat=pending;pending=null;save();renderPats();renderEditor();renderMatrix()}
   }
 }
-function start(){
+function start(countIn){
   ensureAudio();playing=true;step=0;queue=[];heard=[];nextTime=ctx.currentTime+.06;
+  countLeft=countIn?16:0;recFrom=nextTime+countLeft*stepDur();
   scheduler();timer=setInterval(scheduler,25);
   try{navigator.wakeLock&&navigator.wakeLock.request('screen').then(w=>wake=w).catch(()=>{})}catch(e){}
   $('play').setAttribute('aria-pressed','true');$('playTxt').textContent='Stop';
@@ -618,6 +625,7 @@ function stop(){
 }
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&ctx&&playing&&ctx.state!=='running')ctx.resume()});
 function draw(){
+  if(ctx&&playing&&ctx.currentTime>=recFrom)$('recBtn').classList.remove('counting');
   if(ctx&&playing){let s=null;while(queue.length&&queue[0].t<=ctx.currentTime)s=queue.shift().s;if(s!==null)setNow(s)}
   requestAnimationFrame(draw);
 }
@@ -683,12 +691,31 @@ function setupVoices(){
   box.addEventListener('pointerup',e=>{const b=e.target.closest('.voice');if(b&&b._wait){b._wait=false;ensureAudio();hit(b)}});
   box.addEventListener('click',e=>{const b=e.target.closest('.voice');if(b&&e.detail===0){ensureAudio();hit(b)}});   // keyboard
   box.addEventListener('contextmenu',e=>e.preventDefault());
-  $('recBtn').onclick=()=>{setRec(!rec);if(rec&&!playing)start()};
+  $('recBtn').onclick=()=>{
+    if(rec){setRec(false);return}
+    if(playing){setRec(true);return}   // already playing: add to the beat as it loops
+    const pat=state.patterns[state.pat];
+    if(VOICES.some(v=>pat[v.id].some(Boolean))){$('recAsk').hidden=!$('recAsk').hidden}else beginRec(false)};
+  $('recBlank').onclick=()=>beginRec(true);$('recKeep').onclick=()=>beginRec(false);$('recNo').onclick=()=>{$('recAsk').hidden=true};
+  $('clickBtn').setAttribute('aria-pressed',!!state.click);
+  $('clickBtn').onclick=()=>{state.click=!state.click;$('clickBtn').setAttribute('aria-pressed',state.click);save()};
 }
 /* Rec: while the beat runs, each pad tap is saved on the nearest step of the current pattern */
-function setRec(on){rec=on;$('recBtn').setAttribute('aria-pressed',on)}
+function setRec(on){rec=on;$('recBtn').setAttribute('aria-pressed',on);if(!on)$('recBtn').classList.remove('counting')}
+// from stopped: optionally clear the pattern, then start (with a one-bar count-in when the click is on)
+function beginRec(blank){
+  $('recAsk').hidden=true;
+  if(blank){const p=state.patterns[state.pat];VOICES.forEach(v=>p[v.id]=P('................'));renderEditor();renderMatrix();clearReady();renderExport();save()}
+  setRec(true);start(!!state.click);if(countLeft)$('recBtn').classList.add('counting');
+}
+function click(t,strong){   // metronome: a short beep, higher on beat 1; never recorded or exported
+  const o=ctx.createOscillator(),g=ctx.createGain();o.frequency.value=strong?1760:1320;
+  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(strong?.45:.28,t+.002);g.gain.exponentialRampToValueAtTime(.0001,t+.05);
+  o.connect(g);g.connect(LIVE.out);o.start(t);o.stop(t+.06);
+}
 function recHit(id){
   const T=ctx.currentTime-(ctx.outputLatency||ctx.baseLatency||0);   // when the player heard the beat they were tapping along to
+  if(T<recFrom-stepDur()/2)return;   // still in the count-in
   let best=null;for(const h of heard)if(!best||Math.abs(h.t-T)<Math.abs(best.t-T))best=h;
   if(!best)return;const s=best.s,vi=VOICES.findIndex(v=>v.id===id),pat=state.patterns[state.pat][id];
   if(pat[s])return;pat[s]=true;
@@ -729,7 +756,7 @@ function renderMatrix(){
 }
 function setBpm(b){state.bpm=Math.max(60,Math.min(200,Math.round(b)));$('bpm').value=state.bpm;$('bpmOut').textContent=state.bpm;$('bpmLcd').innerHTML=state.bpm.toFixed(1)+'<small>BPM</small>';save()}
 
-$('play').onclick=()=>playing?stop():start();
+$('play').onclick=()=>{$('recAsk').hidden=true;playing?stop():start()};
 $('tDown').onclick=()=>setBpm(state.bpm-1);$('tUp').onclick=()=>setBpm(state.bpm+1);
 $('bpm').oninput=e=>setBpm(+e.target.value);
 GROOVES.forEach(gr=>{const b=document.createElement('button');b.className='tpl';b.dataset.id=gr.id;b.textContent=gr.name;b.onclick=()=>setGroove('tpl',gr.id);$('tpls').appendChild(b)});
