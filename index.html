@@ -147,7 +147,6 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
 .smp-name.on{color:var(--lit)}
 .smp-btns{display:flex;gap:8px}
 .smp-row .notes{flex-basis:100%}
-@media (max-width:520px){.smp-btns{flex-basis:100%}.smp-btns .small{flex:1}}
 .smp-row .notes:empty{display:none}
 .voice.smp span{color:var(--lit)}
 .voice.down{background:var(--lit);color:#2a1606}.voice.down b,.voice.down span{color:#2a1606}
@@ -178,8 +177,8 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
   .scale{grid-template-columns:repeat(2,1fr)}
   .voices{grid-template-columns:repeat(4,minmax(0,1fr))}
 }
-@media (max-width:700px){.transport{grid-template-columns:1fr}.tempo{justify-content:space-between}}   /* buttons above tempo until there's room for both side by side */
-@media (min-width:701px){.tbtns{grid-template-columns:130px repeat(3,88px)}}
+@media (max-width:899px){.transport{grid-template-columns:1fr}.tempo{justify-content:space-between}}   /* buttons above tempo until there's room for both side by side */
+@media (min-width:900px){.tbtns{grid-template-columns:130px repeat(3,88px)}}
 
 /* overview */
 .overview{display:grid;gap:6px}
@@ -248,6 +247,45 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
 .check input::after{content:"";position:absolute;inset:7px;border-radius:2px;background:#3a2622}
 .check input:checked::after{background:var(--lit);box-shadow:0 0 7px var(--lit)}
 .tip{border-radius:6px;box-shadow:inset 0 2px 8px rgba(0,0,0,.5)}
+
+/* ---------- compact layout: transport, pattern, drums and steps all on the first screen ---------- */
+@media (max-width:480px){body{padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px));padding-top:12px}}
+.unit{gap:12px;padding-top:12px}
+.brand{align-items:center;flex-wrap:nowrap;padding-bottom:11px}
+.brand h1{font-size:21px;flex:none}
+.brand p{font-size:10px;letter-spacing:.14em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.play{height:44px;font-size:15px;border-radius:6px}
+.play.rec{font-size:14px}
+.play .dot{width:8px;height:8px}
+.trow2{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+@media (max-width:399px){.lcd{min-width:66px;font-size:19px;padding:5px 6px}.lcd small{display:none}.nudge{width:32px;height:32px}.pats-top .pat{width:33px;min-width:33px}.pats-top #pats{gap:4px}.trow2 .tempo{gap:4px}}
+.trow2 .tempo{justify-content:flex-start;gap:6px}
+.lcd{font-size:21px;padding:5px 8px;min-width:78px}
+.lcd small{font-size:9px;margin-left:4px}
+.nudge{width:34px;height:34px;font-size:18px}
+.pats-top #pats{display:flex;gap:5px}
+.pats-top .pat{min-width:36px;width:36px;height:36px;padding:0;border-radius:5px}
+.pats-top .pat span{display:none}
+.legend{margin-bottom:-6px;min-height:28px}
+.legend span{flex:none}
+.legend .small{order:2;height:28px;font-size:11px;padding:0 10px}
+.voice{height:48px}
+.editor{gap:10px;padding:12px}
+.ed-head{grid-template-columns:minmax(0,1fr) auto!important}
+.ed-head h2{font-size:18px}
+.ed-tools .tgl{min-width:0;padding:0 10px;font-size:13px}
+.ptools{display:flex;align-items:center;gap:6px}
+.ptools .lbl{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ptools .small{padding:0 10px;font-size:12px;flex:none}
+.smp-row{flex-wrap:nowrap;min-height:0;padding-top:10px}
+.smp-row .notes{display:none}
+.smp-row .notes:not(:empty){display:block}
+.smp-row{flex-wrap:wrap}
+.smp-name{font-size:14px}
+.smp-btns .small{padding:0 10px;font-size:12px}
+.groove .faders{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (min-width:900px){.transport{grid-template-columns:auto 1fr}.trow2{justify-content:flex-end;gap:18px}}
+@media (max-width:360px){.unit{padding-left:8px;padding-right:8px}.tbtns{grid-template-columns:1.4fr repeat(3,minmax(0,1fr));gap:6px}.tbtns .play{font-size:12px;letter-spacing:.04em}.play .dot{display:none}.trow2{flex-wrap:wrap}.ed-tools .tgl{padding:0 7px;font-size:12px}.ptools .small{padding:0 7px;font-size:11px}.voice span{display:none}.brand p{display:none}}
 </style>
 </head>
 <body>
@@ -268,19 +306,17 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
   <section class="transport" aria-label="Transport">
     <div class="tbtns"><button class="play" id="play" aria-pressed="false"><span class="dot"></span><span id="playTxt">Start</span></button><button class="play rec" id="recBtn" aria-pressed="false" aria-label="Record taps into the pattern">Rec</button><button class="play rec clk" id="clickBtn" aria-pressed="false" aria-label="Metronome">Click</button><button class="play rec" id="undoBtn" disabled aria-label="Undo the last change to the pattern">Undo</button></div>
     <div class="confirm rec-ask" id="recAsk" hidden><span>Record over this beat, or start from a blank pattern?</span><button class="ex-btn ready" id="recBlank">Start blank</button><button class="small" id="recKeep">Keep beat</button><button class="small" id="recNo">Cancel</button></div>
-    <div class="tempo">
-      <button class="nudge" id="tDown" aria-label="Tempo down">−</button>
-      <div class="lcd" id="bpmLcd" aria-live="polite">125.0<small>BPM</small></div>
-      <button class="nudge" id="tUp" aria-label="Tempo up">+</button>
-    </div>
-    <div class="faders">
-      <label class="fader"><span class="row"><span class="lbl">Tempo</span><output id="bpmOut">125</output></span><input type="range" id="bpm" min="60" max="200" step="1"></label>
-      <label class="fader"><span class="row"><span class="lbl">Accent</span><output id="accOut">50</output></span><input type="range" id="accent" min="0" max="100" step="1"></label>
-      <label class="fader"><span class="row"><span class="lbl">Volume</span><output id="volOut">80</output></span><input type="range" id="volume" min="0" max="100" step="1"></label>
+    <div class="trow2">
+      <div class="tempo">
+        <button class="nudge" id="tDown" aria-label="Tempo down">−</button>
+        <div class="lcd" id="bpmLcd" aria-live="polite">125.0<small>BPM</small></div>
+        <button class="nudge" id="tUp" aria-label="Tempo up">+</button>
+      </div>
+      <div class="pats-top" role="group" aria-label="Pattern"><div id="pats"></div></div>
     </div>
   </section>
 
-  <div class="legend" aria-hidden="true">Instruments · tap to play</div>
+  <div class="legend"><span>Instruments · tap to play</span><button class="small" id="clearMS" style="visibility:hidden">All on</button></div>
   <section class="voices" id="voices" aria-label="Instruments"></section>
 
   <section class="tip" id="tip" aria-label="Quick start" hidden>
@@ -297,30 +333,27 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
   <section class="editor" aria-label="Step editor">
     <div class="ed-head">
       <h2 id="edName">Bass Drum</h2>
-      <span class="ed-tools"><button class="tgl" id="muteBtn" aria-pressed="false">Mute</button><button class="tgl solo" id="soloBtn" aria-pressed="false">Solo</button><button class="tgl" id="rowClear">Clear</button><button class="small" id="clearMS" style="visibility:hidden">All on</button></span>
+      <span class="ed-tools"><button class="tgl" id="muteBtn" aria-pressed="false">Mute</button><button class="tgl solo" id="soloBtn" aria-pressed="false">Solo</button><button class="tgl" id="rowClear">Clear</button></span>
     </div>
+    <div class="steps" id="steps"></div>
+    <div class="scale" aria-hidden="true"><span>Beat 1</span><span>Beat 2</span><span>Beat 3</span><span>Beat 4</span></div>
+    <div class="ptools"><span class="lbl" id="patLbl">A · House</span><button class="small" id="reset">Reset</button><button class="small" id="clear">Clear all</button><button class="small" id="share">Share</button></div>
     <div class="smp-row" id="smpRow">
       <span class="lbl" id="smpLbl">Sound</span><span class="smp-name" id="smpName">Built-in</span>
       <span class="smp-btns"><button class="small" id="smpLoad">Load sample</button><button class="small" id="smpClear">Use built-in</button></span>
       <input type="file" id="smpFile" accept="audio/*,.wav,.aif,.aiff,.mp3,.m4a,.caf" hidden>
       <p class="notes" id="smpMsg" aria-live="polite"></p>
     </div>
-    <div class="steps" id="steps"></div>
-    <div class="scale" aria-hidden="true"><span>Beat 1</span><span>Beat 2</span><span>Beat 3</span><span>Beat 4</span></div>
-  </section>
-
-  <section class="bank" aria-label="Patterns">
-    <span class="lbl">Pattern</span>
-    <div id="pats" style="display:flex;gap:8px;flex-wrap:wrap"></div>
-    <span class="spacer"></span>
-    <button class="small" id="reset">Reset</button>
-    <button class="small" id="clear">Clear</button>
-    <button class="small" id="share">Share</button>
   </section>
 
   <section class="groove" aria-label="Swing and groove">
-    <button class="g-head g-toggle" id="grooveTgl" aria-expanded="false" aria-controls="grooveBody"><span class="gt">Swing &amp; Groove</span><span class="lbl" id="feelName">Straight</span><span class="chev" aria-hidden="true"></span></button>
+    <button class="g-head g-toggle" id="grooveTgl" aria-expanded="false" aria-controls="grooveBody"><span class="gt">Groove &amp; mix</span><span class="lbl" id="feelName">Straight</span><span class="chev" aria-hidden="true"></span></button>
     <div class="g-body" id="grooveBody" hidden>
+      <div class="faders">
+      <label class="fader"><span class="row"><span class="lbl">Tempo</span><output id="bpmOut">125</output></span><input type="range" id="bpm" min="60" max="200" step="1"></label>
+      <label class="fader"><span class="row"><span class="lbl">Accent</span><output id="accOut">50</output></span><input type="range" id="accent" min="0" max="100" step="1"></label>
+      <label class="fader"><span class="row"><span class="lbl">Volume</span><output id="volOut">80</output></span><input type="range" id="volume" min="0" max="100" step="1"></label>
+      </div>
       <div class="g-row">
         <label class="fader"><span class="row"><span class="lbl">Swing</span><output id="swOut">50%</output></span><input type="range" id="swing" min="50" max="75" step="1"></label>
         <div class="g-res"><span class="lbl">Swing on</span><div class="seg" id="res"><button data-r="16">16ths</button><button data-r="8">8ths</button></div></div>
@@ -572,7 +605,7 @@ const SYN={
 };
 /* every drum plays the real 909 recordings from the free Aminet TR-909 set (samples/aminet-tr909).
    Knobs pick the nearest recordings and blend between them; the rebuilt sounds stand in until they have loaded */
-const APP_VERSION='v32';
+const APP_VERSION='v33';
 let recDone=false,recLoaded=0;
 const REC={},RK=['0','3','7','a'],R6=['0','2','4','6','8','a'];
 const kickName=(tu,at,d)=>tu==='0'&&at==='0'&&d==='7'?'bt0a0a7':`bt${tu}a${at}d${d}`;   // that one file has a different name in the set
@@ -744,7 +777,7 @@ function renderPats(){
   PRESETS.forEach((p,i)=>{
     const b=document.createElement('button');
     b.className='pat'+(state.pat===i?' on':'')+(pending===i?' queued':'');
-    b.innerHTML=`<b>${'ABCD'[i]}</b><span>${p.name}</span>`;
+    b.innerHTML=`<b>${'ABCD'[i]}</b><span>${p.name}</span>`;b.setAttribute('aria-label',`Pattern ${'ABCD'[i]}, ${p.name}`);
     b.onclick=()=>{if(playing&&i!==state.pat){pending=i}else{state.pat=i;pending=null;renderEditor();renderMatrix();save()}renderPats()};
     box.appendChild(b);
   });
@@ -805,7 +838,7 @@ function recHit(id){
 }
 function renderEditor(){
   const v=VOICES.find(x=>x.id===state.sel),pat=state.patterns[state.pat][v.id];
-  $('edName').innerHTML=`${v.name} <em>· ${'ABCD'[state.pat]}</em>`;
+  $('edName').textContent=v.name;$('patLbl').textContent=`${'ABCD'[state.pat]} · ${PRESETS[state.pat].name}`;
   renderSampleRow(v);renderMS(v);
   const sb=$('steps');sb.innerHTML='';stepEls=[];
   for(let i=0;i<16;i++){
@@ -850,8 +883,8 @@ const ac=$('accent');ac.value=Math.round(state.accent*100);$('accOut').textConte
 const vo=$('volume');vo.value=Math.round(state.volume*100);$('volOut').textContent=vo.value;vo.oninput=()=>{state.volume=vo.value/100;$('volOut').textContent=vo.value;if(LIVE)LIVE.out.gain.setTargetAtTime(state.volume,ctx.currentTime,.02);save()};
 let clearArm=null;
 $('clear').onclick=e=>{const b=e.currentTarget;
-  if(!clearArm){b.textContent='Tap to confirm';b.classList.add('warn');clearArm=setTimeout(()=>{clearArm=null;b.textContent='Clear';b.classList.remove('warn')},3000);return}
-  clearTimeout(clearArm);clearArm=null;b.textContent='Clear';b.classList.remove('warn');
+  if(!clearArm){b.textContent='Tap to confirm';b.classList.add('warn');clearArm=setTimeout(()=>{clearArm=null;b.textContent='Clear all';b.classList.remove('warn')},3000);return}
+  clearTimeout(clearArm);clearArm=null;b.textContent='Clear all';b.classList.remove('warn');
   snap();const p=state.patterns[state.pat];VOICES.forEach(v=>p[v.id]=P('................'));patChanged()};
 $('reset').onclick=()=>{snap();state.patterns[state.pat]=presetPattern(state.pat);patChanged()};
 $('undoBtn').onclick=undo;
