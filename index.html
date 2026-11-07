@@ -241,7 +241,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
   </section>
 
   <section class="pads" aria-label="Drum pads">
-    <div class="g-head"><h2>Pads</h2><span class="lbl">Tap to play · no need to press Start</span></div>
+    <div class="g-head"><h2>Pads</h2><button class="tgl" id="recBtn" aria-pressed="false" style="margin-right:auto">Rec</button><span class="lbl" id="padInfo">Tap to play · no need to press Start</span></div>
     <div class="padgrid" id="pads"></div>
   </section>
 
@@ -283,7 +283,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
     <p class="notes" id="bkStatus" aria-live="polite">Saves one file with all four patterns, every setting and any samples you've loaded. Keep it in Files or iCloud Drive.</p>
   </section>
 
-  <p class="notes"><b>On iPhone:</b> tap Start once to wake the audio. If you hear nothing, flip the silent switch off and turn the volume up. Patterns and settings are saved on this phone; use Backup to keep a copy. Works offline once it has loaded. Tap a pad to jam (no need to press Start). Tap an instrument button to hear it and select it.</p>
+  <p class="notes"><b>On iPhone:</b> tap Start once to wake the audio. If you hear nothing, flip the silent switch off and turn the volume up. Patterns and settings are saved on this phone; use Backup to keep a copy. Works offline once it has loaded. Tap a pad to jam (no need to press Start); press Rec to save your taps into the pattern as it loops. Tap an instrument button to hear it and select it.</p>
 </main>
 
 <script>
@@ -503,7 +503,7 @@ const SYN={
 };
 /* every drum plays the real 909 recordings from the free Aminet TR-909 set (samples/aminet-tr909).
    Knobs pick the nearest recordings and blend between them; the rebuilt sounds stand in until they have loaded */
-const APP_VERSION='v23';
+const APP_VERSION='v24';
 let recDone=false,recLoaded=0;
 const REC={},RK=['0','3','7','a'],R6=['0','2','4','6','8','a'];
 const kickName=(tu,at,d)=>tu==='0'&&at==='0'&&d==='7'?'bt0a0a7':`bt${tu}a${at}d${d}`;   // that one file has a different name in the set
@@ -591,7 +591,7 @@ let CH=null;
 function trigger(id,t,v){const keep=master;if(CH&&CH.pan[id])master=CH.pan[id];try{const u=samples[id];if(u){playUser(id,u.buf,t,v,state.params[id]);return}if(REC[id]&&RECPLAY[id])return RECPLAY[id](t,v,state.params[id]);if(SYN[id])SYN[id](t,v,state.params[id])}finally{master=keep}}
 
 /* ---------- sequencer ---------- */
-let playing=false,timer,step=0,nextTime=0,queue=[],nowStep=-1,pending=null,wake=null;
+let playing=false,timer,step=0,nextTime=0,queue=[],heard=[],rec=false,nowStep=-1,pending=null,wake=null;
 const stepDur=()=>60/state.bpm/4;
 function audible(id){const anySolo=VOICES.some(v=>state.solo[v.id]);return anySolo?!!state.solo[id]:!state.mute[id]}
 function scheduleStep(s,t0){
@@ -604,7 +604,7 @@ function scheduleStep(s,t0){
     if(!(g.lockKick&&vc.id==='bd')){t+=f.off*sd+r()*g.hTime/1000;v*=f.vel*(1+r()*g.hVel/100)}
     trigger(vc.id,Math.max(t,ctx.currentTime+.003),Math.max(.05,v));
   });
-  queue.push({s,t:t0+f.off*sd});
+  queue.push({s,t:t0+f.off*sd});heard.push({s,t:t0+f.off*sd});if(heard.length>32)heard.shift();
 }
 function scheduler(){
   if(nextTime<ctx.currentTime-.05){nextTime=ctx.currentTime+.05}
@@ -615,13 +615,13 @@ function scheduler(){
   }
 }
 function start(){
-  ensureAudio();playing=true;step=0;queue=[];nextTime=ctx.currentTime+.06;
+  ensureAudio();playing=true;step=0;queue=[];heard=[];nextTime=ctx.currentTime+.06;
   scheduler();timer=setInterval(scheduler,25);
   try{navigator.wakeLock&&navigator.wakeLock.request('screen').then(w=>wake=w).catch(()=>{})}catch(e){}
   $('play').setAttribute('aria-pressed','true');$('playTxt').textContent='Stop';
 }
 function stop(){
-  playing=false;clearInterval(timer);queue=[];setNow(-1);
+  playing=false;clearInterval(timer);queue=[];setNow(-1);setRec(false);
   if(pending!==null){state.pat=pending;pending=null;renderPats();renderEditor();renderMatrix()}
   try{wake&&wake.release();wake=null}catch(e){}
   $('play').setAttribute('aria-pressed','false');$('playTxt').textContent='Start';
@@ -685,9 +685,10 @@ function renderVoices(){
 const PADS=[['cr'],['rd'],['oh'],['ch'],['lt'],['mt'],['ht'],['cp'],['bd',1],['sd'],['rs']];
 function renderPads(){
   const box=$('pads');
+  $('recBtn').onclick=()=>{setRec(!rec);if(rec&&!playing)start()};
   PADS.forEach(([id,wide])=>{const v=VOICES.find(x=>x.id===id),b=document.createElement('button');
     b.type='button';b.className='pad'+(wide?' wide':'');b.dataset.id=id;b.innerHTML=`<b>${v.short}</b><span></span>`;box.appendChild(b)});
-  const hit=b=>{trigger(b.dataset.id,ctx.currentTime,.85);b.classList.add('down');clearTimeout(b._t);b._t=setTimeout(()=>b.classList.remove('down'),110)};
+  const hit=b=>{trigger(b.dataset.id,ctx.currentTime,.85);if(rec&&playing)recHit(b.dataset.id);b.classList.add('down');clearTimeout(b._t);b._t=setTimeout(()=>b.classList.remove('down'),110)};
   box.addEventListener('pointerdown',e=>{const b=e.target.closest('.pad');if(!b)return;e.preventDefault();
     ensureAudio();if(ctx.state==='running'){hit(b)}else{b._wait=true}});
   // phones only let the audio start on a finger lift, so the very first tap plays when lifted
@@ -695,6 +696,17 @@ function renderPads(){
   box.addEventListener('click',e=>{const b=e.target.closest('.pad');if(b&&e.detail===0){ensureAudio();hit(b)}});   // keyboard
   box.addEventListener('contextmenu',e=>e.preventDefault());
   labelPads();
+}
+/* Rec: while the beat runs, each pad tap is saved on the nearest step of the current pattern */
+function setRec(on){rec=on;$('recBtn').setAttribute('aria-pressed',on);$('padInfo').textContent=on?'Recording · taps go on the nearest step':'Tap to play · no need to press Start'}
+function recHit(id){
+  const T=ctx.currentTime-(ctx.outputLatency||ctx.baseLatency||0);   // when the player heard the beat they were tapping along to
+  let best=null;for(const h of heard)if(!best||Math.abs(h.t-T)<Math.abs(best.t-T))best=h;
+  if(!best)return;const s=best.s,vi=VOICES.findIndex(v=>v.id===id),pat=state.patterns[state.pat][id];
+  if(pat[s])return;pat[s]=true;
+  cellEls[vi][s].classList.add('on');
+  if(state.sel===id&&stepEls[s]){stepEls[s].classList.add('on');stepEls[s].setAttribute('aria-pressed',true)}
+  clearReady();renderExport();save();
 }
 function labelPads(){document.querySelectorAll('.pad').forEach(b=>{const v=VOICES.find(x=>x.id===b.dataset.id);b.querySelector('span').textContent=samples[v.id]?'Sample':v.name})}
 function renderEditor(){
