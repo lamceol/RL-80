@@ -1,6 +1,6 @@
 /* RL-80 offline support: keeps a copy of the app on the phone.
    Online it always fetches the latest version first (and refreshes the copy); offline it uses the copy. */
-const CACHE='rl80-v13';
+const CACHE='rl80-v14';
 // ask for a fresh copy with a one-off address, so neither the phone nor GitHub's servers can hand back an old one
 const bust=u=>{const x=new URL(u);x.searchParams.set('_',Date.now());return x.href};
 const CORE=['./','index.html','sounds.js','manifest.webmanifest','fonts/fonts.css',

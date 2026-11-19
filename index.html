@@ -350,7 +350,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
       <li><b>Tap the numbered steps</b> to add or remove hits, then press <b>Start</b> to hear your beat. <b>Undo</b> takes back a mistake, and <b>Share</b> sends your beat as a link.</li>
       <li><b>Jam with a song:</b> turn on <b>Music</b> so your music keeps playing, then press <b>Tap</b> along with the beat, starting on the 1. Press <b>Start</b> and the drums come in on the next 1. <b>◀ ▶</b> nudge the beat if it drifts.</li>
     </ol>
-    <p class="notes">No sound on iPhone? Turn the volume up. With <b>Music</b> on, also flip the silent switch off.</p>
+    <p class="notes">No sound on iPhone? Turn the volume up. With <b>Music</b> on, also turn Silent Mode off (the bell in Control Centre, or the silent switch).</p>
     <button class="ex-btn" id="tipOk">Got it</button>
   </section>
 
@@ -409,7 +409,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
     <p class="notes" id="bkStatus" aria-live="polite"></p>
   </section>
 
-  <p class="notes"><b>On iPhone:</b> if you hear nothing, turn the volume up, and with <b>Music</b> on, flip the silent switch off. Patterns and settings are saved on this phone; use Backup to keep a copy. Works offline once it has loaded. <button class="small" id="tipShow">Show quick start</button></p>
+  <p class="notes"><b>On iPhone:</b> if you hear nothing, turn the volume up, and with <b>Music</b> on, turn Silent Mode off (the bell in Control Centre, or the silent switch). Patterns and settings are saved on this phone; use Backup to keep a copy. Works offline once it has loaded. <button class="small" id="tipShow">Show quick start</button></p>
 </main>
 
 <script>
@@ -512,8 +512,8 @@ function applyMix(C){
   for(const id in PAN){const p=C.pan[id];if(p.pan)set(p.pan,PAN[id]*m.width)}
 }
 let LIVE=null;
-/* iPhone audio mode: 'ambient' plays alongside music from other apps (and follows the silent switch);
-   'playback' takes over the audio, so other apps' music stops (and the silent switch is ignored) */
+/* iPhone audio mode: 'ambient' plays alongside music from other apps (and is muted by Silent Mode);
+   'playback' takes over the audio, so other apps' music stops (and Silent Mode is ignored) */
 function setSessionType(){try{if(navigator.audioSession)navigator.audioSession.type=state.music?'ambient':'playback'}catch(e){}}
 function ensureAudio(){
   if(!ctx){
@@ -941,10 +941,13 @@ function nudge(ms){
   else if(!lock)jamMsg('Nudge moves the beat while it plays.');
 }
 function halfDouble(k){setBpm(state.bpm*k,true);jamMsg(fmtBpm(state.bpm)+' BPM.')}   // the tapped 1 is still a 1
-function setMusic(on){state.music=on;$('musicBtn').setAttribute('aria-pressed',on);save();setSessionType();
-  if(ctx&&ctx.state==='running'){ctx.suspend().then(()=>ctx.resume()).catch(()=>{})}   // so the phone picks up the new mode
-  jamMsg(on?'Music on: your music keeps playing. Flip the silent switch off to hear the drums. If your music stopped, start it again.'
-           :'Music off: RL-80 takes over the sound, so other music stops.')}
+/* iPhone only takes the new audio mode when the sound starts, so if the sound is already running,
+   reload the page (pattern and settings are saved) and say what changed once it's back */
+const MUSIC_MSG={on:'Music on: your music keeps playing alongside the drums. If you hear no drums, turn Silent Mode off (the bell in Control Centre, or the silent switch). If your music stopped, start it again.',
+  off:'Music off: RL-80 takes over the sound, so other music stops.'};
+function setMusic(on){state.music=on;$('musicBtn').setAttribute('aria-pressed',on);saveNow();setSessionType();
+  if(ctx){try{sessionStorage.setItem('rl80music',on?'on':'off')}catch(e){}if(playing)stop();location.reload();return}
+  jamMsg(MUSIC_MSG[on?'on':'off'])}
 const tapBtn=$('tapBtn');
 tapBtn.addEventListener('pointerdown',e=>{e.preventDefault();ensureAudio();onTap(e)});
 tapBtn.addEventListener('pointerup',()=>ensureAudio());   // phones only start the audio on a finger lift
@@ -953,6 +956,7 @@ tapBtn.addEventListener('contextmenu',e=>e.preventDefault());
 $('halfBtn').onclick=()=>halfDouble(.5);$('dblBtn').onclick=()=>halfDouble(2);
 $('nudgeE').onclick=()=>nudge(-10);$('nudgeL').onclick=()=>nudge(10);
 $('musicBtn').setAttribute('aria-pressed',!!state.music);$('musicBtn').onclick=()=>setMusic(!state.music);
+try{const m=sessionStorage.getItem('rl80music');if(m){sessionStorage.removeItem('rl80music');jamMsg(MUSIC_MSG[m]||'')}}catch(e){}
 const fmtBpm=b=>Number.isInteger(b)?String(b):b.toFixed(1);
 function setBpm(b,keepLock){state.bpm=Math.max(60,Math.min(200,Math.round(b*10)/10));if(!keepLock)lock=null;$('bpm').value=state.bpm;$('bpmOut').textContent=fmtBpm(state.bpm);$('bpmLcd').innerHTML=state.bpm.toFixed(1)+'<small>BPM</small>';save()}
 
