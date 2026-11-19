@@ -285,6 +285,18 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
 .smp-btns .small{padding:0 10px;font-size:12px}
 .groove .faders{grid-template-columns:repeat(3,minmax(0,1fr))}
 @media (min-width:900px){.transport{grid-template-columns:auto 1fr}.trow2{justify-content:flex-end;gap:18px}}
+/* jam along: tap tempo, half/double, nudge, play over music */
+.jam{grid-column:1/-1;display:flex;align-items:center;gap:6px}
+.jam .small{height:36px;padding:0 10px;font-size:12px;letter-spacing:.08em;flex:none;touch-action:manipulation}
+.jam .tap{flex:1;min-width:64px;font-size:14px;font-weight:700;letter-spacing:.14em}
+.jam .tap.beat{background:linear-gradient(180deg,#ffa043,#f2800f);color:#2a1606}
+.jam .gap{flex:none;width:2px}
+.jam .mus{position:relative;padding-left:24px}
+.jam .mus::before{content:"";position:absolute;left:9px;top:50%;width:8px;height:8px;margin-top:-4px;border-radius:50%;background:#3a2622;box-shadow:inset 0 1px 1px #0008}
+.jam .mus[aria-pressed="true"]::before{background:var(--lit);box-shadow:0 0 7px var(--lit)}
+.jam-msg{grid-column:1/-1;font-size:13px;margin-top:-6px}
+.jam-msg:empty{display:none}
+@media (max-width:360px){.jam{gap:4px}.jam .small{padding:0 7px;font-size:11px}.jam .mus{padding-left:20px}.jam .mus::before{left:7px}}
 @media (max-width:360px){.unit{padding-left:8px;padding-right:8px}.tbtns{grid-template-columns:1.4fr repeat(3,minmax(0,1fr));gap:6px}.tbtns .play{font-size:12px;letter-spacing:.04em}.play .dot{display:none}.trow2{flex-wrap:wrap}.ed-tools .tgl{padding:0 7px;font-size:12px}.ptools .small{padding:0 7px;font-size:11px}.voice span{display:none}.brand p{display:none}}
 </style>
 </head>
@@ -314,6 +326,17 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
       </div>
       <div class="pats-top" role="group" aria-label="Pattern"><div id="pats"></div></div>
     </div>
+    <div class="jam" role="group" aria-label="Jam along with music">
+      <button class="small tap" id="tapBtn" aria-label="Tap tempo: tap along with the beat, starting on the 1">Tap</button>
+      <button class="small" id="halfBtn" aria-label="Half the tempo">½</button>
+      <button class="small" id="dblBtn" aria-label="Double the tempo">×2</button>
+      <span class="gap" aria-hidden="true"></span>
+      <button class="small" id="nudgeE" aria-label="Nudge the beat earlier">◀</button>
+      <button class="small" id="nudgeL" aria-label="Nudge the beat later">▶</button>
+      <span class="gap" aria-hidden="true"></span>
+      <button class="small mus" id="musicBtn" aria-pressed="false" aria-label="Play over music from other apps">Music</button>
+    </div>
+    <p class="notes jam-msg" id="jamMsg" aria-live="polite"></p>
   </section>
 
   <div class="legend"><span>Instruments · tap to play</span><button class="small" id="clearMS" style="visibility:hidden">All on</button></div>
@@ -325,8 +348,9 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
       <li><b>Tap the drum buttons above</b> to play. No need to press Start.</li>
       <li><b>Press Rec</b> and choose Start blank, then tap along. Turn on <b>Click</b> for a metronome and a count-in.</li>
       <li><b>Tap the numbered steps</b> to add or remove hits, then press <b>Start</b> to hear your beat. <b>Undo</b> takes back a mistake, and <b>Share</b> sends your beat as a link.</li>
+      <li><b>Jam with a song:</b> turn on <b>Music</b> so your music keeps playing, then press <b>Tap</b> along with the beat, starting on the 1. Press <b>Start</b> and the drums come in on the next 1. <b>◀ ▶</b> nudge the beat if it drifts.</li>
     </ol>
-    <p class="notes">No sound on iPhone? Flip the silent switch off and turn the volume up.</p>
+    <p class="notes">No sound on iPhone? Turn the volume up. With <b>Music</b> on, also flip the silent switch off.</p>
     <button class="ex-btn" id="tipOk">Got it</button>
   </section>
 
@@ -350,7 +374,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
     <button class="g-head g-toggle" id="grooveTgl" aria-expanded="false" aria-controls="grooveBody"><span class="gt">Groove &amp; mix</span><span class="lbl" id="feelName">Straight</span><span class="chev" aria-hidden="true"></span></button>
     <div class="g-body" id="grooveBody" hidden>
       <div class="faders">
-      <label class="fader"><span class="row"><span class="lbl">Tempo</span><output id="bpmOut">125</output></span><input type="range" id="bpm" min="60" max="200" step="1"></label>
+      <label class="fader"><span class="row"><span class="lbl">Tempo</span><output id="bpmOut">125</output></span><input type="range" id="bpm" min="60" max="200" step="0.1"></label>
       <label class="fader"><span class="row"><span class="lbl">Accent</span><output id="accOut">50</output></span><input type="range" id="accent" min="0" max="100" step="1"></label>
       <label class="fader"><span class="row"><span class="lbl">Volume</span><output id="volOut">80</output></span><input type="range" id="volume" min="0" max="100" step="1"></label>
       </div>
@@ -385,7 +409,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:4px;bac
     <p class="notes" id="bkStatus" aria-live="polite"></p>
   </section>
 
-  <p class="notes"><b>On iPhone:</b> if you hear nothing, flip the silent switch off and turn the volume up. Patterns and settings are saved on this phone; use Backup to keep a copy. Works offline once it has loaded. <button class="small" id="tipShow">Show quick start</button></p>
+  <p class="notes"><b>On iPhone:</b> if you hear nothing, turn the volume up, and with <b>Music</b> on, flip the silent switch off. Patterns and settings are saved on this phone; use Backup to keep a copy. Works offline once it has loaded. <button class="small" id="tipShow">Show quick start</button></p>
 </main>
 
 <script>
@@ -488,9 +512,12 @@ function applyMix(C){
   for(const id in PAN){const p=C.pan[id];if(p.pan)set(p.pan,PAN[id]*m.width)}
 }
 let LIVE=null;
+/* iPhone audio mode: 'ambient' plays alongside music from other apps (and follows the silent switch);
+   'playback' takes over the audio, so other apps' music stops (and the silent switch is ignored) */
+function setSessionType(){try{if(navigator.audioSession)navigator.audioSession.type=state.music?'ambient':'playback'}catch(e){}}
 function ensureAudio(){
   if(!ctx){
-    try{if(navigator.audioSession)navigator.audioSession.type='playback'}catch(e){}
+    setSessionType();
     ctx=new (window.AudioContext||window.webkitAudioContext)();
     LIVE=buildChain(ctx,ctx.destination);master=LIVE.input;CH=LIVE;
     noiseBuf=ctx.createBuffer(1,ctx.sampleRate*2,ctx.sampleRate);
@@ -725,6 +752,7 @@ function scheduler(){
 }
 function start(countIn){
   ensureAudio();playing=true;step=0;queue=[];heard=[];nextTime=ctx.currentTime+.06;
+  const L=lockNow();if(L){const bar=L.period*4;nextTime=L.one+Math.ceil((nextTime-L.one)/bar)*bar}   // wait for the next 1 of the song
   countLeft=countIn?16:0;recFrom=nextTime+countLeft*stepDur();
   scheduler();timer=setInterval(scheduler,25);
   try{navigator.wakeLock&&navigator.wakeLock.request('screen').then(w=>wake=w).catch(()=>{})}catch(e){}
@@ -867,10 +895,77 @@ function renderMatrix(){
     cellEls.push(row);
   });
 }
-function setBpm(b){state.bpm=Math.max(60,Math.min(200,Math.round(b)));$('bpm').value=state.bpm;$('bpmOut').textContent=state.bpm;$('bpmLcd').innerHTML=state.bpm.toFixed(1)+'<small>BPM</small>';save()}
+/* ---------- jam along: tap tempo, sync, nudge ----------
+   Taps are kept in page time (ms) and turned into audio-clock time only when needed, because on a
+   phone the audio clock doesn't run until the first finger lift. */
+let taps=[],lock=null,tapReset=null,tapFlash=null;
+function audioTimeOf(ms){   // the audio-clock time that was coming out of the speaker at page time ms
+  try{const ts=ctx.getOutputTimestamp&&ctx.getOutputTimestamp();
+    if(ts&&ts.performanceTime>0&&ts.contextTime>0)return ts.contextTime+(ms-ts.performanceTime)/1000}catch(e){}
+  return ctx.currentTime-(ctx.outputLatency||ctx.baseLatency||0)+(ms-performance.now())/1000}
+function fitTaps(){   // straight line through the taps: the slope is the beat length, tap 1 is the 1
+  const n=taps.length,mk=(n-1)/2,mt=taps.reduce((a,b)=>a+b,0)/n;let sxy=0,sxx=0;
+  taps.forEach((t,k)=>{sxy+=(k-mk)*(t-mt);sxx+=(k-mk)*(k-mk)});
+  const period=sxy/sxx;return{period,one:mt-mk*period}}   // ms
+function lockNow(){   // the tapped beat in audio-clock time, if it's recent and the tempo hasn't been changed since
+  if(!lock||!ctx||ctx.state!=='running'||performance.now()-lock.at>90000)return null;
+  return{period:60/state.bpm,one:audioTimeOf(lock.one)+lock.shift}}
+function jamMsg(t){$('jamMsg').textContent=t}
+function onTap(e){
+  const now=performance.now(),t=e&&e.timeStamp>0&&Math.abs(e.timeStamp-now)<1000?e.timeStamp:now;
+  const last=taps[taps.length-1];
+  if(last!==undefined&&t-last<150)return;   // a double tap
+  if(last!==undefined&&t-last>2000)taps=[];   // a long gap starts a new count
+  taps.push(t);if(taps.length>16)taps.splice(0,Math.ceil((taps.length-16)/4)*4);   // drop whole bars, so the first tap is still a 1
+  const b=$('tapBtn');b.classList.add('beat');clearTimeout(tapFlash);tapFlash=setTimeout(()=>b.classList.remove('beat'),90);
+  clearTimeout(tapReset);tapReset=setTimeout(()=>{b.textContent='Tap'},2200);
+  b.textContent=taps.length<4?'Tap '+taps.length:'Tap ✓';
+  if(taps.length<2){jamMsg('Keep tapping along with the beat, starting on the 1.');return}
+  const f=fitTaps();let bpm=6e4/f.period,mult=1;
+  while(bpm<60){bpm*=2;mult*=2}while(bpm>200){bpm/=2;mult/=2}
+  setBpm(bpm);
+  if(taps.length<4){jamMsg('Keep tapping… '+fmtBpm(state.bpm)+' BPM so far.');return}
+  lock={one:f.one,at:now,shift:0};
+  if(playing&&countLeft===0&&ctx&&ctx.state==='running'){realign();jamMsg(fmtBpm(state.bpm)+' BPM · in time with your taps. Use ◀ ▶ if it drifts.')}
+  else jamMsg(fmtBpm(state.bpm)+' BPM · press Start and the drums come in on the next 1.');
+}
+function realign(){   // move the running pattern onto the tapped beat, step 1 on the 1
+  const L=lockNow();if(!L)return;const sd=L.period/4;
+  let n=Math.ceil((nextTime-sd/2-L.one)/sd);let t=L.one+n*sd;
+  while(t<ctx.currentTime+.005){n++;t+=sd}
+  nextTime=t;step=((n%16)+16)%16;
+}
+function nudge(ms){
+  if(lock)lock.shift+=ms/1000;
+  if(playing&&ctx){nextTime+=ms/1000;queue.forEach(q=>q.t+=ms/1000);jamMsg('Nudged '+(ms<0?'earlier':'later')+'.')}
+  else if(!lock)jamMsg('Nudge moves the beat while it plays.');
+}
+function halfDouble(k){setBpm(state.bpm*k,true);jamMsg(fmtBpm(state.bpm)+' BPM.')}   // the tapped 1 is still a 1
+function setMusic(on){state.music=on;$('musicBtn').setAttribute('aria-pressed',on);save();setSessionType();
+  if(ctx&&ctx.state==='running'){ctx.suspend().then(()=>ctx.resume()).catch(()=>{})}   // so the phone picks up the new mode
+  jamMsg(on?'Music on: your music keeps playing. Flip the silent switch off to hear the drums. If your music stopped, start it again.'
+           :'Music off: RL-80 takes over the sound, so other music stops.')}
+const tapBtn=$('tapBtn');
+tapBtn.addEventListener('pointerdown',e=>{e.preventDefault();ensureAudio();onTap(e)});
+tapBtn.addEventListener('pointerup',()=>ensureAudio());   // phones only start the audio on a finger lift
+tapBtn.addEventListener('click',e=>{if(e.detail===0){ensureAudio();onTap(e)}});   // keyboard
+tapBtn.addEventListener('contextmenu',e=>e.preventDefault());
+$('halfBtn').onclick=()=>halfDouble(.5);$('dblBtn').onclick=()=>halfDouble(2);
+$('nudgeE').onclick=()=>nudge(-10);$('nudgeL').onclick=()=>nudge(10);
+$('musicBtn').setAttribute('aria-pressed',!!state.music);$('musicBtn').onclick=()=>setMusic(!state.music);
+const fmtBpm=b=>Number.isInteger(b)?String(b):b.toFixed(1);
+function setBpm(b,keepLock){state.bpm=Math.max(60,Math.min(200,Math.round(b*10)/10));if(!keepLock)lock=null;$('bpm').value=state.bpm;$('bpmOut').textContent=fmtBpm(state.bpm);$('bpmLcd').innerHTML=state.bpm.toFixed(1)+'<small>BPM</small>';save()}
 
 $('play').onclick=()=>{$('recAsk').hidden=true;playing?stop():start()};
-$('tDown').onclick=()=>setBpm(state.bpm-1);$('tUp').onclick=()=>setBpm(state.bpm+1);
+/* − / +: a tap changes the tempo by 0.1, holding it moves in whole BPM */
+function holdKey(btn,dir){let hold=null,rep=null;
+  const end=()=>{clearTimeout(hold);clearInterval(rep);hold=rep=null};
+  btn.addEventListener('pointerdown',e=>{e.preventDefault();end();setBpm(state.bpm+dir*.1);
+    hold=setTimeout(()=>{const step=()=>setBpm(dir>0?Math.floor(state.bpm+1):Math.ceil(state.bpm-1));step();rep=setInterval(step,110)},450)});
+  ['pointerup','pointercancel','pointerleave'].forEach(ev=>btn.addEventListener(ev,end));
+  btn.addEventListener('click',e=>{if(e.detail===0)setBpm(state.bpm+dir*.1)});   // keyboard
+  btn.addEventListener('contextmenu',e=>e.preventDefault())}
+holdKey($('tDown'),-1);holdKey($('tUp'),1);
 $('bpm').oninput=e=>setBpm(+e.target.value);
 GROOVES.forEach(gr=>{const b=document.createElement('button');b.className='tpl';b.dataset.id=gr.id;b.textContent=gr.name;b.onclick=()=>setGroove('tpl',gr.id);$('tpls').appendChild(b)});
 document.querySelectorAll('#res button').forEach(b=>b.onclick=()=>setGroove('res',+b.dataset.r));
@@ -892,12 +987,13 @@ $('rowClear').onclick=()=>{const r=state.patterns[state.pat][state.sel];if(!r.so
 /* share a beat as a link: tempo, groove and the current pattern, packed into the part after # */
 function beatCode(){const g=state.groove,p=state.patterns[state.pat];
   const bits=VOICES.map(v=>p[v.id].reduce((n,on,i)=>n|(on?1<<i:0),0).toString(16).padStart(4,'0')).join('');
-  return ['1',state.bpm,g.swing,g.res,g.tpl,Math.round(g.amount*100),g.hTime,g.hVel,g.lockKick?1:0,bits].join('.')}
-function readBeat(code){const a=String(code).split('.');if(a.length!==10||a[0]!=='1'||!/^[0-9a-f]{48}$/.test(a[9]))return null;
+  return ['2',Math.round(state.bpm*10),g.swing,g.res,g.tpl,Math.round(g.amount*100),g.hTime,g.hVel,g.lockKick?1:0,bits].join('.')}
+function readBeat(code){const a=String(code).split('.');if(a.length!==10||(a[0]!=='1'&&a[0]!=='2')||!/^[0-9a-f]{48}$/.test(a[9]))return null;
+  if(a[0]==='2')a[1]=String(Number(a[1])/10);   // v2 links give the tempo in tenths of a BPM
   const n=i=>Number(a[i]),pat={};VOICES.forEach((v,k)=>{const x=parseInt(a[9].substr(k*4,4),16);pat[v.id]=[...Array(16)].map((_,i)=>!!(x>>i&1))});
   const g={swing:n(2),res:n(3)===8?8:16,tpl:GROOVES.some(t=>t.id===a[4])?a[4]:'straight',amount:n(5)/100,hTime:n(6),hVel:n(7),lockKick:a[8]==='1'};
   if(![1,2,5,6,7].every(i=>Number.isFinite(n(i))))return null;
-  return{bpm:Math.max(60,Math.min(200,n(1))),groove:{...GDEF,...g,swing:Math.max(50,Math.min(75,g.swing)),amount:Math.max(0,Math.min(1.5,g.amount)),hTime:Math.max(0,Math.min(20,g.hTime)),hVel:Math.max(0,Math.min(30,g.hVel))},pat}}
+  return{bpm:Math.max(60,Math.min(200,Math.round(n(1)*10)/10)),groove:{...GDEF,...g,swing:Math.max(50,Math.min(75,g.swing)),amount:Math.max(0,Math.min(1.5,g.amount)),hTime:Math.max(0,Math.min(20,g.hTime)),hVel:Math.max(0,Math.min(30,g.hVel))},pat}}
 $('share').onclick=async()=>{const b=$('share'),url=location.origin+location.pathname+'#b='+beatCode();
   const done=t=>{b.textContent=t;setTimeout(()=>b.textContent='Share',2500)};
   if(navigator.share){try{await navigator.share({title:'RL-80 beat',text:'Have a listen to my beat on RL-80',url});return}catch(e){if(e&&e.name==='AbortError')return}}
@@ -906,7 +1002,7 @@ let incoming=null;
 function checkShared(){const m=location.hash.match(/^#b=([0-9a-z.]+)$/i);if(!m)return;incoming=readBeat(m[1].toLowerCase());
   history.replaceState(null,'',location.pathname+location.search);if(!incoming)return;
   const hits=Object.values(incoming.pat).flat().filter(Boolean).length;
-  $('shareInfo').textContent=`${incoming.bpm} BPM · ${hits} hits`+(incoming.groove.swing>50?` · swing ${incoming.groove.swing}%`:'');
+  $('shareInfo').textContent=`${fmtBpm(incoming.bpm)} BPM · ${hits} hits`+(incoming.groove.swing>50?` · swing ${incoming.groove.swing}%`:'');
   $('shareNote').textContent=`It goes into pattern ${'ABCD'[state.pat]}, replacing what's there. Undo brings yours back.`;
   $('shareIn').hidden=false;scrollTo(0,0)}
 $('shareLoad').onclick=()=>{if(!incoming)return;snap();state.patterns[state.pat]=incoming.pat;state.groove=incoming.groove;setBpm(incoming.bpm);renderGroove();patChanged();
@@ -930,7 +1026,7 @@ function eventsFor(bars){
   }
   return ev.sort((a,b)=>a.t-b.t);
 }
-function fileBase(bars){return `RL-80_${'ABCD'[state.pat]}-${PRESETS[state.pat].name.replace(/\s+/g,'')}_${state.bpm}bpm_${bars}bar`}
+function fileBase(bars){return `RL-80_${'ABCD'[state.pat]}-${PRESETS[state.pat].name.replace(/\s+/g,'')}_${fmtBpm(state.bpm)}bpm_${bars}bar`}
 function buildMidi(bars){
   const PPQ=96,t16=PPQ/4,sd=stepDur(),end=bars*16*t16,ev=[];
   eventsFor(bars).forEach(e=>{
